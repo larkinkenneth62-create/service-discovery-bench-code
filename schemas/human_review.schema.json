@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://servicediscoverybench.local/schemas/human_review.schema.json",
+  "title": "ServiceDiscoveryBench v0.1 human review row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "review_id", "benchmark_task_id", "review_round", "reviewer_id", "blind_pack_id",
+    "content_fingerprint", "semantic_alignment_check", "gold_validity_check", "candidate_validity_check",
+    "service_catalog_check", "task_type_check", "leakage_check", "dependency_check", "final_decision",
+    "error_type", "severity", "notes", "reviewed_at"
+  ],
+  "properties": {
+    "review_id": {"type": "string"},
+    "benchmark_task_id": {"type": "string", "minLength": 1},
+    "review_round": {"enum": ["inherited_primary", "primary", "secondary", "adjudication"]},
+    "reviewer_id": {"type": "string"},
+    "blind_pack_id": {"type": "string", "minLength": 1},
+    "content_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "semantic_alignment_check": {"type": "string"},
+    "gold_validity_check": {"type": "string"},
+    "candidate_validity_check": {"type": "string"},
+    "service_catalog_check": {"type": "string"},
+    "task_type_check": {"type": "string"},
+    "leakage_check": {"type": "string"},
+    "dependency_check": {"type": "string"},
+    "final_decision": {"enum": ["", "keep", "remove", "uncertain"]},
+    "error_type": {"type": "string"},
+    "severity": {"type": "string"},
+    "notes": {"type": "string"},
+    "reviewed_at": {"type": "string"}
+  }
+}

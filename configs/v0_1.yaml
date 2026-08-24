@@ -1,0 +1,45 @@
+project_version: v0.1
+normalization_version: nfkc_ws_v1
+signature_version: sha256_task_v1
+fingerprint_version: sha256_review_content_v1
+
+random_seed: 20260719
+split_seed: 20260719
+split_ratio:
+  train: 0.80
+  dev: 0.10
+  test: 0.10
+
+qa:
+  random_representative: 70
+  stratified_coverage: 20
+  risk_targeted: 10
+  review_mode: single_human_review
+  authoritative_round: primary
+  secondary_reviews_gating: false
+  supplemental_secondary_regular: 20
+  supplemental_secondary_composable: 30
+
+candidate_count_buckets:
+  - [2, 5]
+  - [6, 20]
+  - [21, 50]
+  - [51, 100]
+  - [101, null]
+
+minimum_domain_report_n: 30
+
+allow_llm_in_data_construction: false
+allow_llm_in_final_qa: false
+allow_llm_baseline_after_freeze: true
+
+rewrite:
+  enabled_as_optional_repair: true
+  blocks_v0_1: false
+  require_human_semantic_preservation: true
+  allow_style_classifier: false
+
+release:
+  require_all_six_tasks: true
+  require_human_qa_gate: true
+  require_group_aware_split: true

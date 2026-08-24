@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["api_id", "parent_service_id", "canonical_name", "source_dataset", "source_api_id", "catalog_version", "source_path", "source_sha256"],
+  "properties": {
+    "api_id": {"type": "string", "pattern": "^api::svc::"},
+    "parent_service_id": {"type": "string", "pattern": "^svc::"},
+    "canonical_name": {"type": "string", "minLength": 1},
+    "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

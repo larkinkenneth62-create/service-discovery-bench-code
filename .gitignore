@@ -1,0 +1,41 @@
+# Credentials and local configuration
+.env
+.env.*
+*.key
+*.pem
+*credential*
+*secret*
+*token*
+
+# External and generated data
+external_sources/
+outputs/
+artifacts/
+downloads/
+archive/
+releases/
+experiments/
+tmp/
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.rar
+*.pdf
+*.docx
+*.pptx
+*.xlsx
+
+# Python and tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
