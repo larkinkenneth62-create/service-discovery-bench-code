@@ -1,6 +1,6 @@
 # Qwen SSE Selection V1.5 public review package
 
-This directory contains only the static V1.5 output contracts, parser, runner, token-budget freezer, synthetic harness, and route invariants. It contains no benchmark row, Gold, candidate instance, request, response, endpoint, credential, status log, or result.
+This directory contains only the static V1.5 output contracts, parser, Q0 preflight, runner, token-budget freezer, synthetic harness, and route invariants. It contains no benchmark row, Gold, candidate instance, request, response, endpoint, credential, status log, or result.
 
 The fixed mapping is:
 

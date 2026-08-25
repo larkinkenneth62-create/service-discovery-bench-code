@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 
 MODEL = "Qwen3.6-35B-A3B-APEX-I-Compact.gguf"
-TOKENIZER_REPO_ID = "Qwen/Qwen3-30B-A3B-Instruct-2507"
+TOKENIZER_REPO_ID = "Qwen/Qwen3.6-35B-A3B"
 TOKENIZER_REVISION = "995ad96eacd98c81ed38be0c5b274b04031597b0"
 SAFETY_MARGIN_TOKENS = 64
 
@@ -53,7 +53,7 @@ def task_type(row: dict[str, Any]) -> str:
 
 
 def _flatten_gold_sets(value: Any) -> list[list[str]]:
-    if not isinstance(value, list):
+    if not isinstance(value, list) or not value:
         return []
     if all(isinstance(item, str) for item in value):
         return [value]
@@ -63,27 +63,42 @@ def _flatten_gold_sets(value: Any) -> list[list[str]]:
     return result
 
 
-def dev_selected_cardinality(row: dict[str, Any]) -> int:
+def dev_selected_cardinality(row: dict[str, Any], dev_truth: dict[str, dict[str, Any]]) -> int:
     for field in ("acceptable_gold_sets", "gold_candidate_ids", "gold_ids", "gold"):
         sets = _flatten_gold_sets(row.get(field))
         if sets:
             return max(len(item) for item in sets)
-    return 0
+    request_id = row.get("benchmark_task_id", row.get("request_id", ""))
+    benchmark_task_id = request_id[request_id.index("sdb-") :] if isinstance(request_id, str) and "sdb-" in request_id else request_id
+    truth = dev_truth.get(benchmark_task_id, {})
+    for field in ("acceptable_gold_sets", "reference_gold_ids"):
+        sets = _flatten_gold_sets(truth.get(field))
+        if sets:
+            return max(len(item) for item in sets)
+    count = truth.get("gold_count")
+    return int(count) if isinstance(count, int) and count >= 0 else 0
 
 
 def freeze(
-    *, native_path: Path, machine_path: Path, smoke_path: Path,
+    *, native_path: Path, machine_path: Path, smoke_path: Path, dev_truth_path: Path,
     token_count: Callable[[str], int],
 ) -> dict[str, Any]:
     native_rows = rows(native_path)
     machine_rows = rows(machine_path)
     smoke_rows = rows(smoke_path)
+    dev_truth = {row["benchmark_task_id"]: row for row in rows(dev_truth_path)}
     all_rows = native_rows + machine_rows + smoke_rows
-    max_id = max((item for row in all_rows for item in candidate_ids(row)), key=lambda value: token_count(stable_json(value)))
+    distinct_ids = sorted(
+        {item for row in all_rows for item in candidate_ids(row)},
+        key=lambda value: (-token_count(stable_json(value)), value),
+    )
+    max_id = distinct_ids[0]
     max_id_tokens = token_count(stable_json(max_id))
-    top5_example = {"ranked_candidate_ids": [max_id] * 5}
-    max_dev_selected = max((dev_selected_cardinality(row) for row in smoke_rows if task_type(row).startswith(("multi_", "composable_"))), default=0)
-    selected_example = {"selected_candidate_ids": [max_id] * max_dev_selected}
+    top5_example = {"ranked_candidate_ids": distinct_ids[:5]}
+    max_dev_selected = max((dev_selected_cardinality(row, dev_truth) for row in smoke_rows if task_type(row).startswith(("multi_", "composable_"))), default=0)
+    if max_dev_selected < 1:
+        raise ValueError("Dev selected-set cardinality could not be resolved from the frozen Dev truth")
+    selected_example = {"selected_candidate_ids": distinct_ids[:max_dev_selected]}
     top5_tokens = token_count(stable_json(top5_example))
     selected_tokens = token_count(stable_json(selected_example))
     frozen = max(top5_tokens, selected_tokens) + SAFETY_MARGIN_TOKENS
@@ -113,6 +128,7 @@ def freeze(
         },
         "test_gold_read": False,
         "model_results_read": False,
+        "dev_truth_sha256": sha256_file(dev_truth_path),
     }
 
 
@@ -121,6 +137,7 @@ def main() -> None:
     parser.add_argument("--native", type=Path, required=True)
     parser.add_argument("--machine", type=Path, required=True)
     parser.add_argument("--smoke", type=Path, required=True)
+    parser.add_argument("--dev-truth", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--tokenizer-path", type=Path)
     args = parser.parse_args()
@@ -137,6 +154,7 @@ def main() -> None:
         native_path=args.native,
         machine_path=args.machine,
         smoke_path=args.smoke,
+        dev_truth_path=args.dev_truth,
         token_count=lambda value: len(tokenizer.encode(value, add_special_tokens=False)),
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
