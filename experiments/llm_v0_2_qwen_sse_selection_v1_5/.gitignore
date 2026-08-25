@@ -1,0 +1,13 @@
+00_RUNTIME/*.json
+01_Q0_PREFLIGHT/
+02_Q1_SMOKE_60/
+03_Q2_MACHINE_197/
+04_Q3_NATIVE_4798/
+05_Q4_SCORES/
+06_Q5_BUNDLE/
+*.jsonl
+*.csv
+*.zip
+artifacts/
+responses/
+logs/

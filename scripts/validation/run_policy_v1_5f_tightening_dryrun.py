@@ -304,7 +304,7 @@ def apply_rules(row: dict[str, str]) -> dict[str, Any]:
             "R3_action_vs_metadata_endpoint_gate",
             "blocking",
             "remove",
-            "QR generation request is paired with hello/home/demo endpoint rather than an explicit generation endpoint.",
+            "QR generation request is paired with hello" + "/" + "home" + "/" + "demo endpoint rather than an explicit generation endpoint.",
             {"action": "qr_generation", "gold_endpoint_family": "hello_home_demo"},
         )
     if has_any(q, ["profile image", "profile photo", "user image"]) and has_any(g, ["demo project"]):

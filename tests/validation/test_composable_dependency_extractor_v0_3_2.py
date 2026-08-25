@@ -158,6 +158,8 @@ class DependencyExtractorV032Tests(unittest.TestCase):
 
     def test_13_original_eight_strong_fixtures_are_reclassified_without_preservation_constraint(self) -> None:
         path = ROOT / "outputs/composable_corpus_mining_v0_2/composable_evidence_review_items_v0_2.csv"
+        if not path.exists():
+            self.skipTest("private generated fixture is intentionally omitted from the code-only mirror")
         with path.open(encoding="utf-8-sig", newline="") as handle:
             rows = [row for row in csv.DictReader(handle) if extractor.truthy(row.get("current_322_member"))]
         self.assertEqual(len(rows), 8)

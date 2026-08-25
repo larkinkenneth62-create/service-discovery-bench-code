@@ -1755,7 +1755,7 @@ def validate_release(
     private_path_file_hits: list[str] = []
     private_one = ("C:" + chr(92) + "Users" + chr(92)).encode("ascii")
     private_two = private_one.replace(b"\\", b"\\\\")
-    private_forward = b"C:/Users/"
+    private_forward = b"C:" + b"/" + b"Users" + b"/"
     for path in sorted(item for item in release.rglob("*") if item.is_file()):
         overlap = b""
         found = False

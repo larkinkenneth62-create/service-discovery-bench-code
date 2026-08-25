@@ -1,0 +1,23 @@
+{
+  "contract_revision": "QWEN_SSE_SELECTION_V1_5",
+  "full_permutation_required": false,
+  "machine": {
+    "contract": "TOP5_RANKING_V1",
+    "match": "track == machine"
+  },
+  "native": [
+    {
+      "contract": "TOP5_RANKING_V1",
+      "match": "task_type startswith single_"
+    },
+    {
+      "contract": "SELECTED_SET_V1",
+      "match": "task_type startswith multi_"
+    },
+    {
+      "contract": "SELECTED_SET_V1",
+      "match": "task_type startswith composable_"
+    }
+  ],
+  "unified_supported": false
+}

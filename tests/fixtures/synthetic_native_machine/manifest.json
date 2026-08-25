@@ -1,0 +1,24 @@
+[
+  {
+    "request_id": "synthetic-single-service-001",
+    "task_type": "single_service",
+    "prediction_target": "service",
+    "query": "Find a synthetic weather service.",
+    "candidate_documents": [
+      {"candidate_id": "syn-service-a", "document": "Synthetic weather lookup."},
+      {"candidate_id": "syn-service-b", "document": "Synthetic calendar lookup."}
+    ],
+    "acceptable_gold_sets": [["syn-service-a"]]
+  },
+  {
+    "request_id": "synthetic-multi-api-001",
+    "task_type": "multi_api",
+    "prediction_target": "api",
+    "query": "Fetch synthetic weather and save it.",
+    "candidate_documents": [
+      {"candidate_id": "syn-api-weather", "document": "Synthetic weather API."},
+      {"candidate_id": "syn-api-save", "document": "Synthetic storage API."}
+    ],
+    "acceptable_gold_sets": [["syn-api-weather", "syn-api-save"]]
+  }
+]

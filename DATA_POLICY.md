@@ -19,3 +19,9 @@ Static prompt templates and schema contracts may be published when every
 query, candidate document, candidate ID, label, split assignment, and generated
 response is replaced by a typed placeholder. Such templates are code/protocol,
 not an authorization to publish instantiated benchmark requests.
+
+Qwen SSE Selection V1.5 follows this boundary: only the static template,
+contract registry, runner, parser, scoring code, and synthetic fixtures are
+public. Token-budget freezes bound to real manifests, request/status JSONL,
+responses, parsed predictions, score tables, logs, and handoff archives remain
+private and are rejected by the executable publication audit.
