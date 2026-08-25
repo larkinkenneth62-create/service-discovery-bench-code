@@ -5,7 +5,7 @@
 - 对应纲领：`SDB_RETRIEVER_AND_LLM_EXECUTION_PROTOCOL_V1_2_QWEN_SSE_NATIVE_MACHINE_FIRST_FROZEN.md`
 - 当前状态：`READY_TO_RESUME_FORMAL_QWEN_EXPERIMENT`
 - 第一正式模型：`Qwen3.6-35B-A3B-APEX-I-Compact.gguf`
-- 正式端点：`https://deutschland-spread-granny-holders.trycloudflare.com/v1`
+- 正式端点：由私有运行环境变量 `SDB_QWEN_BASE_URL` 提供；公开镜像不保留历史临时地址。
 - 正式传输：`stream=true + 15s SSE heartbeat`
 - Retriever：`BGE_DENSE_V2@200`，已完成，不再开发
 
@@ -90,7 +90,7 @@ Compact-Alias Machine 197
 ### 3.1 环境变量
 
 ```text
-SDB_QWEN_BASE_URL=https://deutschland-spread-granny-holders.trycloudflare.com/v1
+SDB_QWEN_BASE_URL=<owner-authorized-private-endpoint>
 SDB_QWEN_MODEL=Qwen3.6-35B-A3B-APEX-I-Compact.gguf
 SDB_QWEN_API_KEY_01=<secret>
 SDB_QWEN_API_KEY_02=<secret>

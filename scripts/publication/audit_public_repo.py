@@ -50,7 +50,6 @@ def audit(root: Path, *, files: list[Path] | None = None) -> dict[str, Any]:
         text = _text(path)
         if not text or relative == audit_relative:
             continue
-        archived_v1_4 = relative.startswith("experiments/llm_v0_2_qwen_sse_formal_v1_4/")
         secret_patterns = (
             r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
             r"(?i)authorization\s*[:=]\s*bearer\s+(?!<|\[|\$\{|example)[A-Za-z0-9._-]{16,}",
@@ -61,11 +60,12 @@ def audit(root: Path, *, files: list[Path] | None = None) -> dict[str, Any]:
         if re.search(r"(?i)(?:[A-Z]:[\\/]Users[\\/][^<\s\\/]+|/home/[^<\s/]+|/Users/[^<\s/]+)", text):
             findings["absolute_private_paths"].append(relative)
         tunnel_domain = "trycloudflare" + ".com"
-        if not archived_v1_4 and re.search(r"https?://[^\s)\]>'\"]+" + re.escape(tunnel_domain), text, re.IGNORECASE):
+        if re.search(r"https?://[^\s)\]>'\"]+" + re.escape(tunnel_domain), text, re.IGNORECASE):
             findings["live_tunnel_urls"].append(relative)
         synthetic = relative.startswith("tests/fixtures/synthetic_native_machine/")
+        static_prompt = "/prompts/" in relative and "<" in text
         data_like = path.suffix.lower() in {".json", ".jsonl", ".md"}
-        if data_like and not synthetic and not archived_v1_4 and re.search(r"[\"']query(?:_text)?[\"']\s*:", text) and re.search(r"[\"']candidate_id[\"']\s*:", text):
+        if data_like and not synthetic and not static_prompt and re.search(r"[\"']query(?:_text)?[\"']\s*:", text) and re.search(r"[\"']candidate_id[\"']\s*:", text):
             findings["instantiated_benchmark_rows"].append(relative)
     for name in findings:
         findings[name] = sorted(set(findings[name]))

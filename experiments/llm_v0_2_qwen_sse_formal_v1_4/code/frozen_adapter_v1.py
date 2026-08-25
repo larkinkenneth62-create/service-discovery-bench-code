@@ -19,7 +19,7 @@ import httpx
 
 
 MODEL = "Qwen3.6-35B-A3B-APEX-I-Compact.gguf"
-DEFAULT_BASE_URL = "https://protect-told-tab-resistant.trycloudflare.com/v1"
+DEFAULT_BASE_URL = ""
 KEY_ENV_NAMES = [
     "QWEN_C6_API_KEY_STUDENT01",
     "QWEN_C6_API_KEY_STUDENT02",

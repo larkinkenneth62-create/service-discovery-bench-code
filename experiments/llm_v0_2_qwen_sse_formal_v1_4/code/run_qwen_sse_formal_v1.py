@@ -21,7 +21,7 @@ import httpx
 MODEL = "Qwen3.6-35B-A3B-APEX-I-Compact.gguf"
 TOKENIZER_REVISION = "995ad96eacd98c81ed38be0c5b274b04031597b0"
 FROZEN_ADAPTER_SHA256 = "24e8f423cb58e1f284560689e430cdbdece82d7786ed2ab076c5990fd1923afc"
-DEFAULT_BASE_URL = "https://deutschland-spread-granny-holders.trycloudflare.com/v1"
+DEFAULT_BASE_URL = ""
 KEY_ENV_NAMES = [
     "SDB_QWEN_API_KEY_01",
     "SDB_QWEN_API_KEY_02",

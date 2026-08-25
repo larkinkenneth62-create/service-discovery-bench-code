@@ -6,7 +6,7 @@
 - 数据基线：`ServiceDiscoveryBench-v0.2.0-composable-expansion-docfix1.zip`
 - 数据 release SHA-256：`a199562a898fc0e3ec00563205bc0d739f2e3f592ef25878e085bca55082751c`
 - 第一正式模型：`Qwen3.6-35B-A3B-APEX-I-Compact.gguf`
-- 当前公网 Base URL：`https://deutschland-spread-granny-holders.trycloudflare.com/v1`
+- 当前公网 Base URL：由私有运行环境变量提供；公开镜像不保留历史临时地址。
 - 正式长请求协议：`OpenAI-compatible Chat Completions + SSE stream=true`
 - 正式 Retriever：`BGE_DENSE_V2@200`
 - 适用范围：Qwen Native、Machine Challenge、后置 Unified LLM，以及论文中的 Retriever V2 结果
@@ -135,7 +135,7 @@ Unified 测量完整搜索系统，不单独代表 LLM 能力。它在 Native/Ma
 
 ```text
 Base URL:
-https://deutschland-spread-granny-holders.trycloudflare.com/v1
+<owner-authorized-private-endpoint>
 
 Model:
 Qwen3.6-35B-A3B-APEX-I-Compact.gguf
