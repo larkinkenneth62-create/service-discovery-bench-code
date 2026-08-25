@@ -21,3 +21,26 @@ Eight legacy manual-review/handoff scripts with hard-coded workstation input loc
 ## Dataset boundary
 
 The audit covers this code mirror, not any separately stored dataset. Publication of this repository does not authorize publication of ServiceDiscoveryBench rows, ToolBench copies, annotations, model outputs, or release archives.
+
+## 2026-08-25 Qwen SSE review-package addition
+
+- Added `experiments/llm_v0_2_qwen_sse_formal_v1_4/` at its original workspace-relative path.
+- Exported 12 source-of-truth files without byte changes: eight Python
+  implementation files, two contract-test files, and two frozen governance
+  documents.
+- Added five public-only review aids: a directory `.gitignore`, a static Prompt
+  contract with placeholders, a review README, a data-independent test runner,
+  and a SHA-256 publication manifest.
+- Experiment directory size at audit: 17 text files, 177,695 bytes.
+- Public data-independent tests: 17/17 PASS. Two preserved integration tests
+  require the deliberately omitted private 60-row smoke manifest and were not
+  executed by the public harness.
+- Forbidden-file scan found no JSONL, CSV/TSV, spreadsheet, archive, GGUF,
+  Parquet, PDF, or other experiment-data/binary artifact.
+- Secret/privacy scan found no workstation path, email address, private-key
+  block, GitHub/OpenAI-style token, concrete Bearer value, or standalone
+  48-hex credential.
+- Excluded in full: all runtime caches, manifests, instantiated prompts,
+  requests, raw SSE events, responses, predictions, status rows, metrics,
+  experiment logs, labels, queries, candidate documents, candidate IDs, and
+  dataset/release artifacts.

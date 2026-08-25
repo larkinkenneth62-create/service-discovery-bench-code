@@ -8,9 +8,14 @@ The following categories are deliberately excluded:
 - raw or transformed ServiceDiscoveryBench records
 - train, development, and test splits
 - human annotations and adjudication files
-- generated prompts, model responses, evaluation outputs, and logs
+- instantiated per-record prompts, model responses, evaluation outputs, and logs
 - release archives, checkpoints, PDFs, and unpublished manuscript material
 
 Repository visibility is not dataset-publication authorization. Anyone reproducing the project must obtain each source dataset under its own terms and must comply with its license, privacy requirements, and redistribution restrictions.
 
 If a future dataset release is approved, publish it through a separate reviewed release process with a data card, license analysis, provenance statement, privacy review, checksums, and an explicit list of included files.
+
+Static prompt templates and schema contracts may be published when every
+query, candidate document, candidate ID, label, split assignment, and generated
+response is replaced by a typed placeholder. Such templates are code/protocol,
+not an authorization to publish instantiated benchmark requests.

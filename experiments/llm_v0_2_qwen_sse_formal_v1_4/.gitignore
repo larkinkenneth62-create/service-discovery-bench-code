@@ -1,0 +1,15 @@
+00_RUNTIME/
+01_Q0_PREFLIGHT/
+02_Q1_*/
+03_Q2_*/
+04_Q2_*/
+05_Q3_*/
+artifacts/
+**/artifacts/
+**/REQUEST_STATUS.jsonl
+**/RUN_SUMMARY.json
+**/raw_sse_events.jsonl
+EXPERIMENT_LOG.md
+*.zip
+__pycache__/
+*.pyc
