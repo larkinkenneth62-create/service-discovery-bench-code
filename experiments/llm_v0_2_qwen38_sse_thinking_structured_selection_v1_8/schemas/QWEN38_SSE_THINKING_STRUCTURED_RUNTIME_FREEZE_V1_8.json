@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "endpoint_in_repository": false,
+  "experiment_revision": "QWEN38_SSE_THINKING_STRUCTURED_SELECTION_V1_8",
+  "official_model_id": "Qwen/Qwen3.8-27B-FP8",
+  "max_concurrency": 4,
+  "max_wall_seconds": 7500,
+  "per_key_inflight_limit": 1,
+  "q0_status": "PENDING_LIVE_PREFLIGHT",
+  "request_contract": {
+    "chat_template_kwargs": {
+      "enable_thinking": true,
+      "preserve_thinking": true
+    },
+    "n": 1,
+    "seed": 0,
+    "response_format_template": {
+      "type": "json_schema",
+      "json_schema": {
+        "strict": true,
+        "schema": "dynamic_output_contract_with_candidate_id_enum",
+        "name_by_contract": {
+          "TOP5_RANKING_V1": "sdb_top5_ranking_v1",
+          "SELECTED_SET_V1": "sdb_selected_set_v1"
+        }
+      }
+    },
+    "stream": true,
+    "stream_options": {
+      "include_usage": true
+    },
+    "temperature": 0,
+    "top_p": 1
+  },
+  "q0_max_output_tokens": 1024,
+  "reasoning_channel_policy": "saved_not_scored_content_must_remain_strict_json",
+  "response_format_mode": "dynamic_strict_json_schema_with_candidate_enum",
+  "thinking_mode": "enabled_preserved_separate",
+  "finish_reason_required": "stop",
+  "thinking_allowance_tokens_formal": 4096,
+  "served_model_id": "qwen3.8-27b-fp8",
+  "attempt_audit_contract": {
+    "schema_version": 1,
+    "ledger": "ATTEMPT_LEDGER.jsonl",
+    "start_before_network": true,
+    "finish_after_network": true,
+    "raw_sse_incremental_jsonl": true,
+    "resume_unknown_inflight": "fail_closed",
+    "resume_finished_without_status": "fail_closed",
+    "max_attempts": 4,
+    "max_retries": 3,
+    "retryable_classes": [
+      "transport_or_timeout",
+      "incomplete_sse_termination",
+      "max_wall_time",
+      "http_408_425_429_5xx_524"
+    ],
+    "non_retryable_classes": [
+      "model_identity",
+      "thinking_channel_contract",
+      "choice_count_contract",
+      "invalid_sse_json",
+      "schema_or_parser_failure"
+    ]
+  },
+  "worker_policy": "one long-lived sequential worker per key"
+}

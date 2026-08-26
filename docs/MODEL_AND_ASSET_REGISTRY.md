@@ -3,7 +3,7 @@
 | Asset | Identifier | Revision | License/status | Included |
 |---|---|---|---|---|
 | Dense retriever | `BAAI/bge-small-en-v1.5` | `5c38ec7c405ec4b44b94cc5a9bb96e735b38267a` | MIT | No weights |
-| Qwen3.8 inference model | `Qwen/Qwen3.8-27B-FP8` (served as `qwen3.8-27b-fp8`) | `QWEN38_SSE_THINKING_SELECTION_V1_7` | Owner license verification required | No weights |
+| Qwen3.8 inference model | `Qwen/Qwen3.8-27B-FP8` (served as `qwen3.8-27b-fp8`) | `QWEN38_SSE_THINKING_STRUCTURED_SELECTION_V1_8` | Owner license verification required | No weights |
 | Qwen3.8 token-budget counter | `UTF8_BYTE_UPPER_BOUND_PLUS_REASONING_4096_V1` | deterministic local counter | N/A | Code only |
 | Historical Qwen3.6 route | `Qwen3.6-35B-A3B-APEX-I-Compact.gguf` | terminated at Q0 before formal execution | No result rows reusable in V1.7 | No GGUF |
 | Historical Qwen3.8 non-thinking route | `qwen3.8-27b-fp8` | V1.6 terminated at Q0 strict-JSON gate | Zero benchmark rows; no result rows reusable in V1.7 | No weights |

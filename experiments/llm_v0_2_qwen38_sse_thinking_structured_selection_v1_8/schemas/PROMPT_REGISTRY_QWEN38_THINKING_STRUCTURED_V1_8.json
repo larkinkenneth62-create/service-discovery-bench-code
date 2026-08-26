@@ -1,0 +1,17 @@
+{
+  "benchmark_rows_in_repository": false,
+  "experiment_revision": "QWEN38_SSE_THINKING_STRUCTURED_SELECTION_V1_8",
+  "instantiated_prompts_in_repository": false,
+  "output_contract_revision": "QWEN_SSE_SELECTION_V1_5",
+  "prompt_contract_path": "prompts/SELECTION_PROMPT_CONTRACT_V1_5.md",
+  "prompt_semantics_changed_from_selection_v1_5": false,
+  "response_schema_adds_candidate_enum_outside_visible_prompt": true,
+  "reasoning_visible_to_scorer": false,
+  "task_mapping": {
+    "machine": "TOP5_RANKING_V1",
+    "native_composable": "SELECTED_SET_V1",
+    "native_multi": "SELECTED_SET_V1",
+    "native_single": "TOP5_RANKING_V1"
+  },
+  "unified_supported": false
+}

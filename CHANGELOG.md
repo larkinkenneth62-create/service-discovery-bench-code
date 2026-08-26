@@ -1,5 +1,12 @@
 # Changelog
 
+## Qwen3.8 Thinking Structured Selection V1.8 — 2026-08-26
+
+- Terminated V1.7 fail-closed after a Dev-smoke reasoning-channel contract violation; no V1.7 Machine or Native run is reused.
+- Added per-request strict JSON Schema enforcement with candidate-ID enums while retaining the visible Selection V1.5 prompt, parser, scorer, and task mapping.
+- Added append-only attempt start/finish evidence, incrementally persisted raw SSE, explicit initial-plus-three network retry semantics, and fail-closed resume checks.
+- Expanded zero-benchmark Q0 to 24 distinct requests covering four key slots, both output contracts, one serial round, and two four-way concurrent rounds.
+
 ## Unreleased — Qwen3.8 SSE Thinking Selection V1.7
 
 - Recorded the V1.6 Q0 strict-JSON failure and its zero transmitted benchmark rows; no V1.6 output is reused.

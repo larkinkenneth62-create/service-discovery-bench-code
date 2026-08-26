@@ -23,9 +23,9 @@ ServiceDiscoveryBench v0.2.0 defines six task types and a frozen 4,798-row Nativ
 |---|---|---|
 | Native | Select directly from the frozen Native candidate pool | Code and contracts only |
 | Machine | Top-5 selection on the 197-row Machine Challenge | Code and contracts only |
-| Unified | Retriever-assisted LLM setting | Deferred from Qwen3.8 Thinking Selection V1.7 |
+| Unified | Retriever-assisted LLM setting | Deferred from Qwen3.8 Thinking Structured Selection V1.8 |
 
-The registered paper retriever is `BGE_DENSE_V2@200`. The current independent LLM experiment revision is `QWEN38_SSE_THINKING_SELECTION_V1_7`, using the unchanged Selection V1.5 prompt, parser, scorer, and output semantics. Thinking is preserved in a separate `reasoning_content` channel, saved for audit, and never scored; `content` must remain a complete strict-JSON object. Qwen3.6 V1.4/V1.5 and Qwen3.8 non-thinking V1.6 runs are archived diagnostics and cannot be resumed or reused.
+The registered paper retriever is `BGE_DENSE_V2@200`. The current independent LLM experiment revision is `QWEN38_SSE_THINKING_STRUCTURED_SELECTION_V1_8`, using the unchanged Selection V1.5 visible prompt, parser, scorer, and output semantics. Thinking is preserved separately and never scored; a per-request strict JSON Schema constrains `content`, including an enum of the visible candidate IDs. An append-only attempt ledger and incremental raw-SSE artifacts make interrupted state auditable. Qwen3.6 V1.4/V1.5 and Qwen3.8 V1.6/V1.7 runs cannot be resumed or reused.
 
 ## Installation
 
@@ -41,7 +41,7 @@ python -m pip install -e ".[dev,llm,retriever]"
 python -m compileall src scripts experiments
 python -m pytest -q
 python experiments/llm_v0_2_qwen_sse_selection_v1_5/tests/run_public_code_only_tests_v1_5.py
-python experiments/llm_v0_2_qwen38_sse_thinking_selection_v1_7/tests/run_public_code_only_tests_v1_7.py
+python experiments/llm_v0_2_qwen38_sse_thinking_structured_selection_v1_8/tests/run_public_code_only_tests_v1_8.py
 python scripts/publication/audit_public_repo.py --root .
 ```
 
@@ -64,10 +64,10 @@ No values belong in Git.
 
 ## Canonical entry points
 
-- Current Qwen3.8 runner: `experiments/llm_v0_2_qwen38_sse_thinking_selection_v1_7/code/run_qwen38_sse_thinking_selection_v1_7.py`
-- Current Qwen parsers: `experiments/llm_v0_2_qwen38_sse_thinking_selection_v1_7/code/output_contracts_v1_5.py`
+- Current Qwen3.8 runner: `experiments/llm_v0_2_qwen38_sse_thinking_structured_selection_v1_8/code/run_qwen38_sse_thinking_structured_selection_v1_8.py`
+- Current Qwen parsers: `experiments/llm_v0_2_qwen38_sse_thinking_structured_selection_v1_8/code/output_contracts_v1_5.py`
 - LLM scoring: `scripts/evaluation/score_native_machine_selection_v1_5.py`
-- LLM result bundle: `scripts/release/build_qwen38_thinking_native_machine_bundle_v1_7.py`
+- LLM result bundle: `scripts/release/build_qwen38_thinking_structured_native_machine_bundle_v1_8.py`
 - Registered dense retriever: `scripts/evaluation/run_bge_retriever.py`
 - Publication audit: `scripts/publication/audit_public_repo.py`
 
