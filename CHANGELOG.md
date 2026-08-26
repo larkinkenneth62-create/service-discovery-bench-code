@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Qwen3.8 SSE Selection V1.6
+
+- Registered the independent `Qwen/Qwen3.8-27B-FP8` route with exact served ID `qwen3.8-27b-fp8`.
+- Added explicit non-thinking request flags, fail-closed model/reasoning response checks, raw SSE event audit artifacts, Q0 capability reporting, and independent resume namespace guards.
+- Preserved the frozen Selection V1.5 task mapping, retriever, candidate pools, split, scoring semantics, Machine/Native counts, and conditional execution gates; no Qwen3.6 row is reused.
+- Added public registries, governance documents, synthetic tests, and a review-indexed V1.6 result-bundle builder without publishing endpoints, credentials, benchmark data, requests, or responses.
+
 ## Unreleased — Qwen SSE Selection V1.5
 
 - Archived V1.4 full-permutation execution as diagnostic-only.

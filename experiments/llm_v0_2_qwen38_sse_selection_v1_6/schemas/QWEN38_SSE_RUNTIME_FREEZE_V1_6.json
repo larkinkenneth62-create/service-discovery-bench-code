@@ -1,0 +1,24 @@
+{
+  "endpoint_in_repository": false,
+  "experiment_revision": "QWEN38_SSE_SELECTION_V1_6",
+  "max_concurrency": 4,
+  "max_wall_seconds": 7500,
+  "per_key_inflight_limit": 1,
+  "q0_status": "PENDING_LIVE_PREFLIGHT",
+  "request_contract": {
+    "chat_template_kwargs": {
+      "enable_thinking": false,
+      "preserve_thinking": false
+    },
+    "n": 1,
+    "seed": 0,
+    "stream": true,
+    "stream_options": {
+      "include_usage": true
+    },
+    "temperature": 0,
+    "top_p": 1
+  },
+  "served_model_id": "qwen3.8-27b-fp8",
+  "worker_policy": "one long-lived sequential worker per key"
+}

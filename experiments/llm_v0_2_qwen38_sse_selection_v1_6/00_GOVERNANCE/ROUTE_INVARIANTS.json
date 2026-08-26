@@ -1,0 +1,18 @@
+{
+  "dataset_changed": false,
+  "experiment_revision": "QWEN38_SSE_SELECTION_V1_6",
+  "full_permutation_required": false,
+  "machine_contract": "TOP5_RANKING_V1",
+  "native_composable_contract": "SELECTED_SET_V1",
+  "native_expected_rows": 4798,
+  "native_multi_contract": "SELECTED_SET_V1",
+  "native_single_contract": "TOP5_RANKING_V1",
+  "old_rows_reused": 0,
+  "official_model_id": "Qwen/Qwen3.8-27B-FP8",
+  "served_model_id": "qwen3.8-27b-fp8",
+  "thinking_mode": "disabled",
+  "qwen36_rows_reused": 0,
+  "retriever_changed": false,
+  "route_changed": false,
+  "machine_expected_rows": 197
+}

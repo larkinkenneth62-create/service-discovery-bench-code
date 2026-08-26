@@ -1,0 +1,14 @@
+{
+  "benchmark_rows_in_repository": false,
+  "experiment_revision": "QWEN38_SSE_SELECTION_V1_6",
+  "instantiated_prompts_in_repository": false,
+  "output_contract_revision": "QWEN_SSE_SELECTION_V1_5",
+  "prompt_contract_path": "prompts/SELECTION_PROMPT_CONTRACT_V1_5.md",
+  "task_mapping": {
+    "machine": "TOP5_RANKING_V1",
+    "native_composable": "SELECTED_SET_V1",
+    "native_multi": "SELECTED_SET_V1",
+    "native_single": "TOP5_RANKING_V1"
+  },
+  "unified_supported": false
+}

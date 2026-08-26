@@ -26,4 +26,4 @@ addopts = "-ra"
 pythonpath = [".", "src"]
 
 [tool.coverage.run]
-source = ["src", "scripts", "experiments/llm_v0_2_qwen_sse_selection_v1_5/code"]
+source = ["src", "scripts", "experiments/llm_v0_2_qwen_sse_selection_v1_5/code", "experiments/llm_v0_2_qwen38_sse_selection_v1_6/code"]

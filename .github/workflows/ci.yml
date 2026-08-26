@@ -28,5 +28,6 @@ jobs:
       - run: python -m compileall src scripts experiments
       - run: python -m pytest -q --junitxml=pytest-${{ matrix.python-version }}.xml
       - run: python experiments/llm_v0_2_qwen_sse_selection_v1_5/tests/run_public_code_only_tests_v1_5.py
+      - run: python experiments/llm_v0_2_qwen38_sse_selection_v1_6/tests/run_public_code_only_tests_v1_6.py
       - run: python scripts/publication/audit_public_repo.py --root .
       - run: git diff --check
