@@ -75,6 +75,8 @@ def main() -> None:
             if isinstance(message, dict) else None
         )
         usage = outcome.final_response.get("usage") if outcome.final_response is not None else None
+        raw_events_path = args.output.parent / f"slot-{slot}" / "RAW_SSE_EVENTS.json"
+        R.atomic_json(raw_events_path, outcome.raw_sse_events or [])
         results.append({
             "key_slot": slot,
             "http_status": outcome.http_status,
@@ -83,8 +85,14 @@ def main() -> None:
             "done_received": outcome.done_received,
             "response_model": None if outcome.final_response is None else outcome.final_response.get("model"),
             "final_content_present": isinstance(content, str) and bool(content.strip()),
+            "final_content": content,
+            "response_message_keys": sorted(message) if isinstance(message, dict) else [],
             "reasoning_content_absent_or_empty": reasoning in (None, ""),
             "parse_valid": bool(parsed and parsed.valid),
+            "parse_error_code": None if parsed is None else parsed.error_code,
+            "parse_error_message": None if parsed is None else parsed.error_message,
+            "raw_sse_events_path": str(raw_events_path.relative_to(args.output.parent)).replace("\\", "/"),
+            "raw_sse_events_sha256": R.sha256_file(raw_events_path),
             "usage_supported": isinstance(usage, dict) and bool(usage),
             "usage": usage,
             "first_event_latency_ms": outcome.first_event_latency_ms,
