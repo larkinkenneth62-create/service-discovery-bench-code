@@ -121,6 +121,8 @@ def test_response_envelope_allows_optional_reasoning_and_rejects_bad_envelopes()
     without_reasoning = {"model": R.MODEL, "choices": [{"message": {"content": "{}"}}]}
     assert R.response_envelope_ok(without_reasoning)
     assert R.reasoning_metadata(without_reasoning)["reasoning_channel_status"] == "absent"
+    assert R.response_envelope_ok({"model": R.MODEL, "choices": [{"message": {"content": ""}}]})
+    assert R.response_envelope_ok({"model": R.MODEL, "choices": [{"message": {"content": "  \n"}}]})
     assert R.response_envelope_ok({
         "model": R.MODEL,
         "choices": [{"message": {"content": "{}", "reasoning_content": ["invalid"]}}],
@@ -298,7 +300,7 @@ def test_valid_json_succeeds_with_or_without_reasoning(tmp_path, monkeypatch, re
     assert result["reasoning_channel_status"] == ("present" if reasoning else "absent")
 
 
-@pytest.mark.parametrize("content", ["analysis text", 'analysis {"ranked_candidate_ids":["c1"]}'])
+@pytest.mark.parametrize("content", ["", "  \n", "analysis text", 'analysis {"ranked_candidate_ids":["c1"]}'])
 def test_invalid_full_content_is_parse_failure_without_retry(tmp_path, monkeypatch, content):
     response = {"model": R.MODEL, "choices": [{"message": {"content": content}, "finish_reason": "stop"}], "usage": {}}
     outcome = R.SSEOutcome(200, response, 1, 2, True, True, "stop", raw_sse_events=[])
@@ -307,7 +309,22 @@ def test_invalid_full_content_is_parse_failure_without_retry(tmp_path, monkeypat
     result = runner.run_one(item(0), 0)
     runner.close()
     assert result["status"] == "parse_failure"
+    assert result["parse_status"] == "invalid"
     assert result["attempt_count"] == 1 and result["retry_count"] == 0
+
+
+def test_route_and_protocol_revision_metadata_are_explicit_and_route_is_inherited():
+    experiment = PATH.parents[1]
+    route = json.loads((experiment / "00_GOVERNANCE" / "ROUTE_INVARIANTS.json").read_text(encoding="utf-8"))
+    provenance = json.loads((experiment / "RUN_PROVENANCE.json").read_text(encoding="utf-8"))
+    expected_route = "QWEN38_SSE_THINKING_STRUCTURED_SELECTION_V1_8"
+    expected_protocol = "SDB_RETRIEVER_AND_LLM_EXECUTION_PROTOCOL_V1_6_QWEN38_SSE_MODEL_FAILURE_ACCOUNTING_NATIVE_MACHINE_FIRST_FROZEN"
+    assert route["experiment_revision"] == R.REVISION
+    assert route["route_revision"] == expected_route
+    assert route["protocol_revision"] == expected_protocol
+    assert route["route_changed"] is False
+    assert provenance["route_revision"] == expected_route
+    assert provenance["protocol_revision"] == expected_protocol
 
 
 def test_model_mismatch_is_hard_api_error(tmp_path, monkeypatch):

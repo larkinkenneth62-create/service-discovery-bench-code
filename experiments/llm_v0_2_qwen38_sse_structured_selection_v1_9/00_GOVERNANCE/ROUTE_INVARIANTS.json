@@ -1,6 +1,8 @@
 {
   "dataset_changed": false,
   "experiment_revision": "QWEN38_SSE_STRUCTURED_SELECTION_MODEL_FAILURE_ACCOUNTING_V1_9",
+  "route_revision": "QWEN38_SSE_THINKING_STRUCTURED_SELECTION_V1_8",
+  "protocol_revision": "SDB_RETRIEVER_AND_LLM_EXECUTION_PROTOCOL_V1_6_QWEN38_SSE_MODEL_FAILURE_ACCOUNTING_NATIVE_MACHINE_FIRST_FROZEN",
   "full_permutation_required": false,
   "machine_contract": "TOP5_RANKING_V1",
   "native_composable_contract": "SELECTED_SET_V1",
@@ -36,6 +38,6 @@
   },
   "qwen36_rows_reused": 0,
   "retriever_changed": false,
-  "route_changed": true,
+  "route_changed": false,
   "machine_expected_rows": 197
 }

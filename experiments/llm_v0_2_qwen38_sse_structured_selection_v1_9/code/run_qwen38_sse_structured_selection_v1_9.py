@@ -384,7 +384,7 @@ def response_envelope_ok(final_response: dict[str, Any] | None) -> bool:
     if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
         return False
     message = choices[0].get("message")
-    if not isinstance(message, dict) or not isinstance(message.get("content"), str) or not message["content"].strip():
+    if not isinstance(message, dict) or not isinstance(message.get("content"), str):
         return False
     return True
 
@@ -778,7 +778,7 @@ class SelectionRunner:
                 "status": "api_error",
                 "parse_status": "not_attempted",
                 "error_code": "RESPONSE_ENVELOPE_CONTRACT_VIOLATION",
-                "error_message": "response lacks exactly one choice with one non-empty content string",
+                "error_message": "response lacks exactly one choice with a textual content field",
             }
         if outcome.finish_reason != "stop":
             return {**base, "status": "parse_failure", "parse_status": "invalid", "error_code": "NON_STOP_FINISH_REASON", "error_message": "a complete model answer requires finish_reason=stop"}
