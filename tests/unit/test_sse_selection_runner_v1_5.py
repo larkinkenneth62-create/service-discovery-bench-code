@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
+import threading
+import time
+from collections import Counter
 from pathlib import Path
 
 import pytest
-
 
 PATH = Path(__file__).resolve().parents[2] / "experiments" / "llm_v0_2_qwen_sse_selection_v1_5" / "code" / "run_qwen_sse_selection_v1_5.py"
 SPEC = importlib.util.spec_from_file_location("runner_v1_5_tested", PATH)
@@ -13,6 +16,21 @@ assert SPEC and SPEC.loader
 R = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = R
 SPEC.loader.exec_module(R)
+
+
+def item(index: int) -> object:
+    return R.RequestItem(
+        request_id=f"synthetic-{index}",
+        track="native",
+        task_type="single_service_discovery",
+        prediction_target="service",
+        candidate_ids=["c1"],
+        candidate_documents=[{"candidate_id": "c1", "document": "synthetic"}],
+        contract=R.CONTRACTS.TOP5_RANKING_V1,
+        payload={"model": R.MODEL},
+        source_row_sha256=f"source-{index}",
+        candidate_order_sha256=f"order-{index}",
+    )
 
 
 def test_formal_counts_and_filters_are_guarded():
@@ -64,3 +82,45 @@ def test_parse_failure_is_not_retryable_infrastructure():
     result = R.CONTRACTS.parse_topk_response({"choices": [{"message": {"content": '{"ranked_candidate_ids":[]}'}}]}, ["c1"], 1)
     assert not result.valid
     assert result.error_code == "TOPK_LENGTH_MISMATCH"
+
+
+def test_one_worker_per_key_never_overlaps_same_slot(tmp_path, monkeypatch):
+    runner = R.SelectionRunner("https://example.invalid/v1", ["k0", "k1", "k2", "k3"], tmp_path, 4, {})
+    active: Counter[int] = Counter()
+    peak: Counter[int] = Counter()
+    lock = threading.Lock()
+
+    def fake_run_one(request_item, slot):
+        with lock:
+            active[slot] += 1
+            peak[slot] = max(peak[slot], active[slot])
+        time.sleep(0.01)
+        with lock:
+            active[slot] -= 1
+        return {
+            "experiment_revision": R.REVISION,
+            "request_id": request_item.request_id,
+            "status": "succeeded",
+            "parse_status": "valid",
+            "task_type": request_item.task_type,
+            "prediction_target": request_item.prediction_target,
+            "output_contract": request_item.contract,
+            "candidate_count": 1,
+            "slot_index": slot,
+        }
+
+    monkeypatch.setattr(runner, "run_one", fake_run_one)
+    summary = runner.run([item(index) for index in range(12)], "formal")
+    runner.close()
+    assert summary["status"] == "COMPLETE_ALL_PARSED"
+    assert all(value <= 1 for value in peak.values())
+    assert set(peak) == {0, 1, 2, 3}
+
+
+def test_duplicate_resume_status_is_rejected(tmp_path):
+    row = {"experiment_revision": R.REVISION, "request_id": "dup", "status": "succeeded"}
+    (tmp_path / "REQUEST_STATUS.jsonl").write_text(json.dumps(row) + "\n" + json.dumps(row) + "\n", encoding="utf-8")
+    runner = R.SelectionRunner("https://example.invalid/v1", ["k0"], tmp_path, 1, {})
+    with pytest.raises(ValueError, match="duplicate request ID"):
+        runner.run([item(0)], "diagnostic")
+    runner.close()

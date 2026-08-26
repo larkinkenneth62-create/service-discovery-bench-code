@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   public-tests:
     runs-on: ubuntu-latest
@@ -12,14 +15,18 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e ".[dev,llm,retriever]"
+      # Public tests exercise retrieval contracts with NumPy, but do not download or
+      # instantiate the registered Transformer model.  Keeping Torch/Transformers out
+      # of this matrix makes the code-only CI deterministic and substantially faster.
+      - run: python -m pip install -e ".[dev,llm]"
       - run: python -m compileall src scripts experiments
-      - run: python -m pytest -q
+      - run: python -m pytest -q --junitxml=pytest-${{ matrix.python-version }}.xml
       - run: python experiments/llm_v0_2_qwen_sse_selection_v1_5/tests/run_public_code_only_tests_v1_5.py
+      - run: python scripts/publication/audit_public_repo.py --root .
       - run: git diff --check

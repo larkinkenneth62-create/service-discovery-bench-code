@@ -6,3 +6,7 @@
 - Replaced complete permutations with Top-5 ranking for Single/Machine and minimal sufficient selected sets for Multi/Composable.
 - Added formal subset guards, strict no-repair parsers, frozen token-budget tooling, scoring, result bundling, public synthetic tests, CI, and an executable publication audit.
 - Added registered BGE Dense V2 and RRF public implementations plus reproducibility documentation.
+
+## Qwen SSE Selection V1.5 R2
+
+Fixed per-key concurrency, legal selected-set output budgeting, scoring aggregation, exact result-bundle validation, and the public BGE reproduction entry point. No dataset, Retriever selection, Prompt semantics, Gold, split, candidate pool, or formal result was changed.

@@ -18,10 +18,9 @@ from typing import Any
 
 import httpx
 
-
 MODEL = "Qwen3.6-35B-A3B-APEX-I-Compact.gguf"
 TOKENIZER_REVISION = "995ad96eacd98c81ed38be0c5b274b04031597b0"
-REVISION = "QWEN_SSE_SELECTION_V1_5"
+REVISION = "QWEN_SSE_SELECTION_V1_5_R2"
 KEY_ENV_NAMES = [f"SDB_QWEN_API_KEY_{index:02d}" for index in range(1, 5)]
 EXPECTED_FORMAL_ROWS = {"machine": 197, "native": 4798}
 RETRY_BACKOFF_SECONDS = (15, 30, 60)
@@ -148,12 +147,19 @@ def assert_resume_namespace(output_dir: Path) -> None:
     status_path = output_dir / "REQUEST_STATUS.jsonl"
     if not status_path.exists():
         return
-    for line in status_path.read_text(encoding="utf-8").splitlines():
+    seen: set[str] = set()
+    for line_number, line in enumerate(status_path.read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
             continue
         row = json.loads(line)
         if row.get("experiment_revision") != REVISION:
-            raise SystemExit("resume status does not belong to Qwen SSE Selection V1.5")
+            raise SystemExit("resume status does not belong to Qwen SSE Selection V1.5 R2")
+        request_id = row.get("request_id")
+        if not isinstance(request_id, str) or not request_id:
+            raise SystemExit(f"invalid resume request ID at line {line_number}")
+        if request_id in seen:
+            raise SystemExit(f"duplicate resume request ID: {request_id}")
+        seen.add(request_id)
 
 
 def _visible_from_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -233,6 +239,7 @@ def build_payload(
             "required": ["selected_candidate_ids"],
             "properties": {"selected_candidate_ids": {
                 "type": "array", "items": {"type": "string"}, "uniqueItems": True,
+                "maxItems": len(candidate_ids),
             }},
         }
     else:
@@ -298,6 +305,9 @@ def load_items(path: Path, track: str, max_tokens: int) -> list[RequestItem]:
             source_row_sha256=sha256_text(stable_json(row)),
             candidate_order_sha256=row.get("candidate_order_hash") or sha256_text("\n".join(candidate_ids)),
         ))
+    request_ids = [item.request_id for item in items]
+    if len(request_ids) != len(set(request_ids)):
+        raise ValueError("duplicate request ID in input manifest")
     return items
 
 
@@ -364,6 +374,8 @@ def _consume_frame(data: str, event_name: str | None, state: dict[str, Any]) -> 
 
 class SelectionRunner:
     def __init__(self, base_url: str, keys: list[str], output_dir: Path, concurrency: int, provenance: dict[str, Any]) -> None:
+        if concurrency < 1:
+            raise ValueError("concurrency must be positive")
         self.base_url = base_url.rstrip("/")
         self.keys = keys
         self.output_dir = output_dir
@@ -421,7 +433,12 @@ class SelectionRunner:
                     elif line.startswith("data:"):
                         data_lines.append(line[5:].lstrip())
                 if data_lines:
-                    _consume_frame("\n".join(data_lines), event_name, state)
+                    kind, error = _consume_frame("\n".join(data_lines), event_name, state)
+                    if kind == "data" and first_data is None:
+                        first_data = (time.perf_counter() - started) * 1000
+                    if error:
+                        return SSEOutcome(200, None, state["heartbeats"], state["events"], state["terminal"], state["done"], state["finish_reason"],
+                                          first_event, first_data, error, "SSE error event", True)
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             return SSEOutcome(None, None, state["heartbeats"], state["events"], state["terminal"], state["done"], state["finish_reason"],
                               first_event, first_data, "TRANSPORT_ERROR", f"{type(exc).__name__}: {exc}", True)
@@ -468,6 +485,7 @@ class SelectionRunner:
             "candidate_order_sha256": item.candidate_order_sha256,
             "source_row_sha256": item.source_row_sha256,
             "request_sha256": item.request_sha256,
+            "slot_index": slot,
             "attempt_count": len(attempts),
             "retry_count": len(attempts) - 1,
             "attempts": attempts,
@@ -487,38 +505,66 @@ class SelectionRunner:
         atomic_json(artifact / "request.json", item.payload)
         if outcome.error_code is not None:
             status = "infra_error" if outcome.retryable else "api_error"
-            row = {**base, "status": status, "parse_status": "not_attempted", "error_code": outcome.error_code, "error_message": outcome.error_message}
-        elif outcome.final_response is None or outcome.final_response.get("model") != MODEL:
-            row = {**base, "status": "api_error", "parse_status": "not_attempted", "error_code": "MODEL_IDENTITY_MISMATCH", "error_message": "response model differs from frozen model"}
+            return {**base, "status": status, "parse_status": "not_attempted", "error_code": outcome.error_code, "error_message": outcome.error_message}
+        if outcome.final_response is None or outcome.final_response.get("model") != MODEL:
+            return {**base, "status": "api_error", "parse_status": "not_attempted", "error_code": "MODEL_IDENTITY_MISMATCH", "error_message": "response model differs from frozen model"}
+        atomic_json(artifact / "response.json", outcome.final_response)
+        if item.contract == CONTRACTS.TOP5_RANKING_V1:
+            parsed = CONTRACTS.parse_topk_response(outcome.final_response, item.candidate_ids, min(5, len(item.candidate_ids)))
         else:
-            atomic_json(artifact / "response.json", outcome.final_response)
-            if item.contract == CONTRACTS.TOP5_RANKING_V1:
-                parsed = CONTRACTS.parse_topk_response(outcome.final_response, item.candidate_ids, min(5, len(item.candidate_ids)))
-            else:
-                parsed = CONTRACTS.parse_selected_set_response(outcome.final_response, item.candidate_ids)
-            if parsed.valid:
-                atomic_json(artifact / "parsed_prediction.json", parsed.data)
-                row = {**base, "status": "succeeded", "parse_status": "valid", "error_code": None, "error_message": None,
-                       "parsed_prediction_path": str((artifact / "parsed_prediction.json").relative_to(self.output_dir)).replace("\\", "/")}
-            else:
-                row = {**base, "status": "parse_failure", "parse_status": "invalid", "error_code": parsed.error_code, "error_message": parsed.error_message}
-        return row
+            parsed = CONTRACTS.parse_selected_set_response(outcome.final_response, item.candidate_ids)
+        if parsed.valid:
+            atomic_json(artifact / "parsed_prediction.json", parsed.data)
+            return {**base, "status": "succeeded", "parse_status": "valid", "error_code": None, "error_message": None,
+                    "parsed_prediction_path": str((artifact / "parsed_prediction.json").relative_to(self.output_dir)).replace("\\", "/")}
+        return {**base, "status": "parse_failure", "parse_status": "invalid", "error_code": parsed.error_code, "error_message": parsed.error_message}
+
+    def _run_slot_queue(self, slot: int, queue: list[RequestItem], status_path: Path) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for item in queue:
+            row = self.run_one(item, slot)
+            append_jsonl(status_path, row, self.write_lock)
+            rows.append(row)
+        return rows
 
     def run(self, items: list[RequestItem], mode: str) -> dict[str, Any]:
+        item_ids = [item.request_id for item in items]
+        if len(item_ids) != len(set(item_ids)):
+            raise ValueError("duplicate request ID in input items")
         status_path = self.output_dir / "REQUEST_STATUS.jsonl"
         completed: dict[str, dict[str, Any]] = {}
         if status_path.exists():
-            for line in status_path.read_text(encoding="utf-8").splitlines():
-                if line.strip():
-                    row = json.loads(line)
-                    completed[row["request_id"]] = row
-        pending = [item for item in items if item.request_id not in completed]
-        with ThreadPoolExecutor(max_workers=self.concurrency, thread_name_prefix="qwen-selection-v1-5") as pool:
-            futures = {pool.submit(self.run_one, item, index % len(self.keys)): item for index, item in enumerate(pending)}
+            for line_number, line in enumerate(status_path.read_text(encoding="utf-8").splitlines(), 1):
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                request_id = row.get("request_id")
+                if not isinstance(request_id, str) or not request_id:
+                    raise ValueError(f"invalid resume request ID at line {line_number}")
+                if request_id in completed:
+                    raise ValueError(f"duplicate request ID in resume status: {request_id}")
+                if row.get("experiment_revision") != REVISION:
+                    raise ValueError(f"resume row has the wrong revision: {request_id}")
+                completed[request_id] = row
+        extra = sorted(set(completed) - set(item_ids))
+        if extra:
+            raise ValueError(f"resume status contains requests outside the current manifest: {extra[:10]}")
+        active_slots = min(self.concurrency, len(self.keys))
+        if active_slots < 1:
+            raise ValueError("at least one key/worker slot is required")
+        # Preserve the original deterministic request-to-slot mapping across resume.
+        # Completed rows are skipped, but the remaining requests do not shift to a
+        # different key merely because an earlier request already finished.
+        slot_queues: list[list[RequestItem]] = [[] for _ in range(active_slots)]
+        for index, item in enumerate(items):
+            if item.request_id not in completed:
+                slot_queues[index % active_slots].append(item)
+        with ThreadPoolExecutor(max_workers=active_slots, thread_name_prefix="qwen-selection-v1-5-r2") as pool:
+            futures = {pool.submit(self._run_slot_queue, slot, queue, status_path): slot for slot, queue in enumerate(slot_queues) if queue}
             for future in as_completed(futures):
-                row = future.result()
-                append_jsonl(status_path, row, self.write_lock)
-                completed[row["request_id"]] = row
+                for row in future.result():
+                    completed[row["request_id"]] = row
+
         rows = [completed[item.request_id] for item in items if item.request_id in completed]
         counts = Counter(row["status"] for row in rows)
         unresolved = counts["infra_error"] + counts["api_error"]
@@ -530,7 +576,7 @@ class SelectionRunner:
             set_max = max((row["candidate_count"] for row in rows if row["output_contract"] == CONTRACTS.SELECTED_SET_V1), default=0)
             gate = (
                 len(rows) == 60 and unresolved == 0 and counts["succeeded"] >= 54
-                and all(counter["valid"] >= 8 for counter in per_task.values())
+                and len(per_task) == 6 and all(counter["valid"] >= 8 for counter in per_task.values())
                 and any(row["candidate_count"] == top_max and row["status"] == "succeeded" for row in rows if row["output_contract"] == CONTRACTS.TOP5_RANKING_V1)
                 and any(row["candidate_count"] == set_max and row["status"] == "succeeded" for row in rows if row["output_contract"] == CONTRACTS.SELECTED_SET_V1)
             )
@@ -541,6 +587,7 @@ class SelectionRunner:
             status = "BLOCKED_INPUT_OR_CONTRACT"
         else:
             status = "COMPLETE_ALL_PARSED" if counts["parse_failure"] == 0 else "COMPLETE_WITH_MODEL_FAILURES"
+        per_slot = Counter(int(row.get("slot_index", -1)) for row in rows)
         summary = {
             **self.provenance,
             "experiment_revision": REVISION,
@@ -549,6 +596,9 @@ class SelectionRunner:
             "requested_rows": len(items),
             "terminal_rows": len(rows),
             "status_counts": dict(sorted(counts.items())),
+            "active_key_slots": active_slots,
+            "per_slot_terminal_rows": {str(key): value for key, value in sorted(per_slot.items())},
+            "per_key_inflight_limit": 1,
             "generated_at_utc": utc_now(),
         }
         atomic_json(self.output_dir / "RUN_SUMMARY.json", summary)
@@ -571,7 +621,7 @@ def load_budget(path: Path, track: str, source: Path) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Qwen SSE Selection V1.5 runner")
+    parser = argparse.ArgumentParser(description="Qwen SSE Selection V1.5 R2 runner")
     parser.add_argument("--mode", choices=("smoke", "formal", "diagnostic"), required=True)
     parser.add_argument("--track", choices=("smoke", "machine", "native"), required=True)
     parser.add_argument("--input", type=Path, required=True)
@@ -601,7 +651,7 @@ def main() -> None:
         if args.limit is not None:
             if args.limit < 1:
                 raise SystemExit("--limit must be positive")
-            items = items[:args.limit]
+            items = items[: args.limit]
     root = Path(__file__).resolve().parents[3]
     prompt = Path(__file__).resolve().parents[1] / "prompts" / "SELECTION_PROMPT_CONTRACT_V1_5.md"
     registry = Path(__file__).resolve().parents[1] / "schemas" / "TASK_OUTPUT_CONTRACT_REGISTRY_V1_5.json"

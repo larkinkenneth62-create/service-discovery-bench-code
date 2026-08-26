@@ -13,7 +13,9 @@ dependencies = ["PyYAML>=6.0"]
 [project.optional-dependencies]
 llm = ["httpx>=0.27,<1"]
 retriever = ["numpy>=1.26", "torch>=2.2", "transformers>=4.51,<5"]
-dev = ["pytest>=8.0"]
+# NumPy is sufficient for the public BGE/RRF contract tests.  Torch and
+# Transformers remain opt-in through the retriever extra.
+dev = ["pytest>=8.0", "numpy>=1.26", "scipy>=1.13"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
