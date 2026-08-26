@@ -1,0 +1,17 @@
+{
+  "experiment_revision": "QWEN38_SSE_STRUCTURED_SELECTION_MODEL_FAILURE_ACCOUNTING_V1_9",
+  "model_family": "Qwen3.8",
+  "official_model_id": "Qwen/Qwen3.8-27B-FP8",
+  "parameter_class": "27B dense",
+  "served_model_id": "qwen3.8-27b-fp8",
+  "reasoning_channel_policy": "optional_saved_not_scored",
+  "content_policy": "full_message_strict_selection_json_or_parse_failure",
+  "structured_output_policy": "requested_not_assumed",
+  "response_format_mode": "dynamic_strict_json_schema_with_candidate_enum",
+  "thinking_mode": "requested_preserve_optional_observed",
+  "token_budget_counter_revision": "UTF8_BYTE_UPPER_BOUND_PLUS_REASONING_4096_V1",
+  "tokenizer_repo_id": "Qwen/Qwen3.8-27B-FP8",
+  "tokenizer_revision": "RUNTIME_REPORTED_OR_UNAVAILABLE",
+  "weight_format": "FP8",
+  "weights_in_repository": false
+}

@@ -1,0 +1,20 @@
+{
+  "benchmark_data_in_repository": false,
+  "credentials_in_repository": false,
+  "endpoint_in_repository": false,
+  "experiment_revision": "QWEN38_SSE_STRUCTURED_SELECTION_MODEL_FAILURE_ACCOUNTING_V1_9",
+  "formal_execution_status": "NOT_RUN_IN_PUBLIC_REPOSITORY",
+  "governance": {
+    "execution_plan": "00_GOVERNANCE/SDB_LLM_RETRIEVER_RAPID_EXECUTION_PLAN_V1_8_QWEN38_SSE_MODEL_FAILURE_ACCOUNTING_NATIVE_MACHINE_FIRST_FINAL.md",
+    "protocol": "00_GOVERNANCE/SDB_RETRIEVER_AND_LLM_EXECUTION_PROTOCOL_V1_6_QWEN38_SSE_MODEL_FAILURE_ACCOUNTING_NATIVE_MACHINE_FIRST_FROZEN.md"
+  },
+  "old_qwen36_rows_reused": 0,
+  "old_qwen38_v1_6_rows_reused": 0,
+  "old_qwen38_v1_7_rows_reused": 0,
+  "old_qwen38_v1_8_rows_reused": 0,
+  "reasoning_channel_policy": "optional_saved_not_scored",
+  "content_policy": "full_message_strict_selection_json_or_parse_failure",
+  "structured_output_policy": "requested_not_assumed",
+  "response_format_mode": "dynamic_strict_json_schema_with_candidate_enum",
+  "served_model_id": "qwen3.8-27b-fp8"
+}

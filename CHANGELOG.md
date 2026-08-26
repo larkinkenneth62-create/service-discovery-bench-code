@@ -1,5 +1,12 @@
 # Changelog
 
+## Qwen3.8 Structured Selection V1.9 — 2026-08-26
+
+- Closed V1.8 fail-closed after its synthetic Q0 produced 23/24 strict parses with zero infrastructure errors and zero benchmark rows; no V1.8 result row is reused.
+- Made the reasoning channel optional audit metadata while preserving the unchanged Selection V1.5 full-content parser and scorer.
+- Classified complete-envelope invalid model content as a non-retryable `parse_failure` that remains in the denominator and scores zero; model identity, transport, authentication, and incomplete SSE remain hard blocks.
+- Froze a 24-request Q0 feasibility gate: at least 22/24 overall, 10/12 per contract, 5/6 per key slot, and zero infrastructure/API errors.
+
 ## Qwen3.8 Thinking Structured Selection V1.8 — 2026-08-26
 
 - Terminated V1.7 fail-closed after a Dev-smoke reasoning-channel contract violation; no V1.7 Machine or Native run is reused.
