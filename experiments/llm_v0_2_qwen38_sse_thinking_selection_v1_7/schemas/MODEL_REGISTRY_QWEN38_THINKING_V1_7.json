@@ -1,0 +1,14 @@
+{
+  "experiment_revision": "QWEN38_SSE_THINKING_SELECTION_V1_7",
+  "model_family": "Qwen3.8",
+  "official_model_id": "Qwen/Qwen3.8-27B-FP8",
+  "parameter_class": "27B dense",
+  "served_model_id": "qwen3.8-27b-fp8",
+  "reasoning_channel_policy": "saved_not_scored_content_must_remain_strict_json",
+  "thinking_mode": "enabled_preserved_separate",
+  "token_budget_counter_revision": "UTF8_BYTE_UPPER_BOUND_PLUS_REASONING_4096_V1",
+  "tokenizer_repo_id": "Qwen/Qwen3.8-27B-FP8",
+  "tokenizer_revision": "RUNTIME_REPORTED_OR_UNAVAILABLE",
+  "weight_format": "FP8",
+  "weights_in_repository": false
+}

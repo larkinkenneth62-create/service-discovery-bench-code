@@ -1,0 +1,23 @@
+{
+  "dataset_changed": false,
+  "experiment_revision": "QWEN38_SSE_THINKING_SELECTION_V1_7",
+  "full_permutation_required": false,
+  "machine_contract": "TOP5_RANKING_V1",
+  "native_composable_contract": "SELECTED_SET_V1",
+  "native_expected_rows": 4798,
+  "native_multi_contract": "SELECTED_SET_V1",
+  "native_single_contract": "TOP5_RANKING_V1",
+  "old_rows_reused": 0,
+  "old_qwen38_v1_6_rows_reused": 0,
+  "official_model_id": "Qwen/Qwen3.8-27B-FP8",
+  "served_model_id": "qwen3.8-27b-fp8",
+  "parser_semantics_changed": false,
+  "reasoning_channel_policy": "saved_not_scored_content_must_remain_strict_json",
+  "scorer_changed": false,
+  "selection_prompt_semantics_changed": false,
+  "thinking_mode": "enabled_preserved_separate",
+  "qwen36_rows_reused": 0,
+  "retriever_changed": false,
+  "route_changed": true,
+  "machine_expected_rows": 197
+}

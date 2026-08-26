@@ -23,9 +23,9 @@ ServiceDiscoveryBench v0.2.0 defines six task types and a frozen 4,798-row Nativ
 |---|---|---|
 | Native | Select directly from the frozen Native candidate pool | Code and contracts only |
 | Machine | Top-5 selection on the 197-row Machine Challenge | Code and contracts only |
-| Unified | Retriever-assisted LLM setting | Deferred from Qwen3.8 Selection V1.6 |
+| Unified | Retriever-assisted LLM setting | Deferred from Qwen3.8 Thinking Selection V1.7 |
 
-The registered paper retriever is `BGE_DENSE_V2@200`. The current independent LLM experiment revision is `QWEN38_SSE_SELECTION_V1_6`, using the unchanged Selection V1.5 output semantics. Qwen3.6 V1.4/V1.5 runs are archived diagnostics and must not be resumed or reused as formal V1.6 results.
+The registered paper retriever is `BGE_DENSE_V2@200`. The current independent LLM experiment revision is `QWEN38_SSE_THINKING_SELECTION_V1_7`, using the unchanged Selection V1.5 prompt, parser, scorer, and output semantics. Thinking is preserved in a separate `reasoning_content` channel, saved for audit, and never scored; `content` must remain a complete strict-JSON object. Qwen3.6 V1.4/V1.5 and Qwen3.8 non-thinking V1.6 runs are archived diagnostics and cannot be resumed or reused.
 
 ## Installation
 
@@ -41,7 +41,7 @@ python -m pip install -e ".[dev,llm,retriever]"
 python -m compileall src scripts experiments
 python -m pytest -q
 python experiments/llm_v0_2_qwen_sse_selection_v1_5/tests/run_public_code_only_tests_v1_5.py
-python experiments/llm_v0_2_qwen38_sse_selection_v1_6/tests/run_public_code_only_tests_v1_6.py
+python experiments/llm_v0_2_qwen38_sse_thinking_selection_v1_7/tests/run_public_code_only_tests_v1_7.py
 python scripts/publication/audit_public_repo.py --root .
 ```
 
@@ -64,10 +64,10 @@ No values belong in Git.
 
 ## Canonical entry points
 
-- Current Qwen3.8 runner: `experiments/llm_v0_2_qwen38_sse_selection_v1_6/code/run_qwen38_sse_selection_v1_6.py`
-- Current Qwen parsers: `experiments/llm_v0_2_qwen38_sse_selection_v1_6/code/output_contracts_v1_5.py`
+- Current Qwen3.8 runner: `experiments/llm_v0_2_qwen38_sse_thinking_selection_v1_7/code/run_qwen38_sse_thinking_selection_v1_7.py`
+- Current Qwen parsers: `experiments/llm_v0_2_qwen38_sse_thinking_selection_v1_7/code/output_contracts_v1_5.py`
 - LLM scoring: `scripts/evaluation/score_native_machine_selection_v1_5.py`
-- LLM result bundle: `scripts/release/build_llm_native_machine_bundle_v1_5.py`
+- LLM result bundle: `scripts/release/build_qwen38_thinking_native_machine_bundle_v1_7.py`
 - Registered dense retriever: `scripts/evaluation/run_bge_retriever.py`
 - Publication audit: `scripts/publication/audit_public_repo.py`
 

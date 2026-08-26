@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Qwen3.8 SSE Thinking Selection V1.7
+
+- Recorded the V1.6 Q0 strict-JSON failure and its zero transmitted benchmark rows; no V1.6 output is reused.
+- Added the independent preserved-thinking runtime contract: reasoning is saved separately and never scored, while the full `content` alone must pass the unchanged Selection V1.5 parser.
+- Expanded Q0 to four key slots times Top-5 and selected-set, added runtime-freeze/hash gates, and froze a 4,096-token formal reasoning allowance.
+- Preserved Prompt semantics, parser, scorer, data, candidate order, Retriever/K, smoke identity, and formal row counts.
+
 ## Unreleased — Qwen3.8 SSE Selection V1.6
 
 - Registered the independent `Qwen/Qwen3.8-27B-FP8` route with exact served ID `qwen3.8-27b-fp8`.
