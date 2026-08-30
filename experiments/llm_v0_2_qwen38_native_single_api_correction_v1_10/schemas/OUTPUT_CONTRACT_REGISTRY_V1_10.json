@@ -1,0 +1,28 @@
+{
+  "contract_revision": "SINGLE_API_RANKING_AND_SET_V1_10",
+  "experiment_revision": "QWEN38_NATIVE_SINGLE_API_RANKING_AND_SET_CORRECTION_V1_10",
+  "invalid_selection_content": "parse_failure, scored zero, no repair, no format retry",
+  "transport_enforcement": "dynamic_strict_combined_json_schema_with_candidate_enum",
+  "machine_rerun": false,
+  "native": [
+    {
+      "contract": "TOP5_RANKING_V1",
+      "match": "task_type == single_service_discovery",
+      "rerun": false
+    },
+    {
+      "contract": "RANKING_AND_SELECTED_SET_V1_10",
+      "match": "task_type == single_api_recommendation",
+      "formal_rows": 3043,
+      "rerun": true
+    },
+    {
+      "contract": "SELECTED_SET_V1",
+      "match": "task_type startswith multi_ or composable_",
+      "rerun": false
+    }
+  ],
+  "test_gold_cardinality_used": false,
+  "unified_supported": false
+}
+

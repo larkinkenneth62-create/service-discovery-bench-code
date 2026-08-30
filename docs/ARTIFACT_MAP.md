@@ -7,5 +7,7 @@
 | Qwen3.8 Native/Machine protocol | V1.6 runner and Selection V1.5 prompt registry | model/runtime/output registries and token freeze | frozen request manifests | request statuses, raw SSE events and parsed predictions | Code public; runs private |
 | Ranking tables | `score_native_machine_selection_v1_5.py` | task/metric registry | Gold and parsed predictions | aggregate score tables | Code public; tables pending run |
 | Result validation | `build_llm_native_machine_bundle_v1_5.py` | runtime provenance | run summaries and score tables | manifest, checksums, latest result | Code public; bundle private |
+| Single API contract correction | `experiments/llm_v0_2_qwen38_native_single_api_correction_v1_10/` | combined contract and V1.10 runtime freeze | filtered 3,043-row request manifest | statuses and combined predictions | Code public; rows/results private |
+| Corrected Native scoring | `scripts/evaluation/score_single_api_correction_v1_10.py` | exact-task aggregation | V1.9 retained rows plus V1.10 Single API outputs | corrected six-task and comparison tables | Code public; tables private |
 
 No numeric model result is claimed by this map before the corresponding private run passes its gate.

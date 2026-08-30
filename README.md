@@ -1,5 +1,7 @@
 # ServiceDiscoveryBench
 
+> Known-result correction: V1.9 treated `single_api_recommendation` as ranking-only. Because one parent service may require multiple APIs, its 91.46% Hit@1 and the historical mixed-contract Micro/Macro indices are ranking diagnostics, not unified exact-completion rates. The V1.10 code-only correction is under `experiments/llm_v0_2_qwen38_native_single_api_correction_v1_10/`.
+
 ServiceDiscoveryBench evaluates whether retrieval and language-model systems can identify the Service or API capabilities needed to complete a user request.
 
 ## Public status

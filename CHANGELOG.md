@@ -1,5 +1,13 @@
 # Changelog
 
+## V1.10 — Single API ranking-and-set contract correction
+
+- Correct `single_api_recommendation` from ranking-only to a combined Top-5 ranking plus minimal-sufficient selected API set.
+- Add a strict parser and candidate-enum schema supporting selected sets larger than five without using Test Gold cardinality.
+- Add an 8-request synthetic gate, a 10-row frozen Single API Dev-smoke gate, and a 3,043-row targeted formal runner.
+- Add corrected six-task exact-completion scoring while retaining V1.9 mixed-contract results as historical diagnostics.
+- Add focused regression coverage and code-only publication controls; no benchmark rows or private run artifacts are published.
+
 ## Qwen3.8 Structured Selection V1.9 — 2026-08-26
 
 - Closed V1.8 fail-closed after its synthetic Q0 produced 23/24 strict parses with zero infrastructure errors and zero benchmark rows; no V1.8 result row is reused.

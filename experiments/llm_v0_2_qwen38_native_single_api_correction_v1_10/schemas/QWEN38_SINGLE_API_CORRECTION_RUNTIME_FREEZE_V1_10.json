@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "endpoint_in_repository": false,
+  "experiment_revision": "QWEN38_NATIVE_SINGLE_API_RANKING_AND_SET_CORRECTION_V1_10",
+  "official_model_id": "Qwen/Qwen3.8-27B-FP8",
+  "served_model_id": "qwen3.8-27b-fp8",
+  "max_concurrency": 4,
+  "max_wall_seconds": 7500,
+  "per_key_inflight_limit": 1,
+  "q0_max_output_tokens": 1024,
+  "thinking_allowance_tokens_formal": 4096,
+  "thinking_mode": "requested_preserve_optional_observed",
+  "reasoning_channel_policy": "optional_saved_not_scored",
+  "content_policy": "full_message_strict_selection_json_or_parse_failure",
+  "structured_output_policy": "requested_not_assumed",
+  "response_format_mode": "dynamic_strict_combined_json_schema_with_candidate_enum",
+  "finish_reason_required": "stop",
+  "request_contract": {
+    "stream": true,
+    "stream_options": {"include_usage": true},
+    "temperature": 0,
+    "top_p": 1,
+    "n": 1,
+    "seed": 0,
+    "chat_template_kwargs": {"enable_thinking": true, "preserve_thinking": true},
+    "response_format_template": {
+      "type": "json_schema",
+      "json_schema": {
+        "strict": true,
+        "schema": "dynamic_output_contract_with_candidate_id_enum",
+        "name_by_contract": {
+          "TOP5_RANKING_V1": "sdb_top5_ranking_v1",
+          "SELECTED_SET_V1": "sdb_selected_set_v1",
+          "RANKING_AND_SELECTED_SET_V1_10": "sdb_ranking_and_selected_set_v1_10"
+        }
+      }
+    }
+  },
+  "attempt_audit_contract": {
+    "schema_version": 1,
+    "ledger": "ATTEMPT_LEDGER.jsonl",
+    "start_before_network": true,
+    "finish_after_network": true,
+    "raw_sse_incremental_jsonl": true,
+    "resume_unknown_inflight": "fail_closed",
+    "resume_finished_without_status": "fail_closed",
+    "max_attempts": 4,
+    "max_retries": 3
+  }
+}
+
