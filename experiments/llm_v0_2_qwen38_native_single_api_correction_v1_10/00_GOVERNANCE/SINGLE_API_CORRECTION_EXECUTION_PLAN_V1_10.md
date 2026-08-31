@@ -8,3 +8,6 @@
 6. Score the correction output and combine it with the untouched 1,755 V1.9 Native rows for corrected six-task exact-completion tables.
 7. Publish only code, synthetic fixtures, documentation, and tests; retain all benchmark rows and results in the private handoff.
 
+## R02 execution note
+
+Before network access, Q0 now binds the existing budget freeze and formal source-manifest hash, validates an R02 runtime freeze whose Q0 budget is 5,924, and passes that value through every synthetic payload and report. R02 runs one new complete 8-request Q0; it neither supplements only the six failures nor reuses the two R01 successes. The original 7/8 overall and per-slot gates remain unchanged. A failed R02 stops before Dev and Test; a passing R02 continues with the already frozen ten-row Dev smoke and then the existing 3,043-row formal scope.

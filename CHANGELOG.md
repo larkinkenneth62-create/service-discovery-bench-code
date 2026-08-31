@@ -1,5 +1,11 @@
 # Changelog
 
+## V1.10 R02 — Q0 budget alignment
+
+- Align the synthetic Q0 `max_tokens` with the existing frozen 5,924-token formal budget; the previous Q0 used 1,024 and remains an archived failed run.
+- Bind Q0 to the existing budget and formal source-manifest hashes before network access, and record the actual requested budget per synthetic result.
+- Preserve the task contract, prompt, schema, parser, model, thinking and sampling settings, retry accounting, dataset, retriever, and formal budget.
+
 ## V1.10 — Single API ranking-and-set contract correction
 
 - Correct `single_api_recommendation` from ranking-only to a combined Top-5 ranking plus minimal-sufficient selected API set.

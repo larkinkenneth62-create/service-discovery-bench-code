@@ -27,6 +27,7 @@ TOKENIZER_REPO_ID = "Qwen/Qwen3.8-27B-FP8"
 TOKENIZER_REVISION = "RUNTIME_REPORTED_OR_UNAVAILABLE"
 TOKEN_BUDGET_COUNTER_REVISION = "UTF8_BYTE_UPPER_BOUND_PLUS_REASONING_4096_V1"
 REVISION = "QWEN38_NATIVE_SINGLE_API_RANKING_AND_SET_CORRECTION_V1_10"
+RUNTIME_PATCH_ID = "V1_10_R02_Q0_BUDGET_ALIGNMENT"
 THINKING_MODE = "requested_preserve_optional_observed"
 RESPONSE_FORMAT_MODE = "dynamic_strict_combined_json_schema_with_candidate_enum"
 REASONING_CHANNEL_POLICY = "optional_saved_not_scored"
@@ -926,7 +927,9 @@ def load_budget(path: Path, track: str, source: Path) -> dict[str, Any]:
     return {"frozen_max_tokens": int(record["frozen_max_tokens"]), "budget_freeze_sha256": sha256_file(path), "source_manifest_sha256": source_hash}
 
 
-def load_runtime_freeze(path: Path) -> dict[str, Any]:
+def load_runtime_freeze(path: Path, *, expected_q0_max_output_tokens: int) -> dict[str, Any]:
+    if expected_q0_max_output_tokens < 1:
+        raise SystemExit("expected Q0 max-output budget must be positive")
     value = json.loads(path.read_text(encoding="utf-8"))
     request = value.get("request_contract")
     chat = request.get("chat_template_kwargs") if isinstance(request, dict) else None
@@ -942,7 +945,8 @@ def load_runtime_freeze(path: Path) -> dict[str, Any]:
         "structured_output_policy": STRUCTURED_OUTPUT_POLICY,
         "finish_reason_required": "stop",
         "thinking_allowance_tokens_formal": 4096,
-        "q0_max_output_tokens": 1024,
+        "q0_max_output_tokens": expected_q0_max_output_tokens,
+        "runtime_patch_id": RUNTIME_PATCH_ID,
         "max_concurrency": 4,
         "per_key_inflight_limit": 1,
         "endpoint_in_repository": False,
@@ -997,6 +1001,8 @@ def load_runtime_freeze(path: Path) -> dict[str, Any]:
     return {
         "runtime_freeze_sha256": sha256_file(path),
         "runtime_freeze_schema_version": value.get("schema_version"),
+        "runtime_patch_id": value.get("runtime_patch_id"),
+        "q0_max_output_tokens": value.get("q0_max_output_tokens"),
     }
 
 
@@ -1022,8 +1028,11 @@ def main() -> None:
     raw_rows = [line for line in args.input.read_text(encoding="utf-8").splitlines() if line.strip()]
     validate_mode_arguments(mode=args.mode, track=args.track, row_count=len(raw_rows), limit=args.limit, request_id=args.request_id)
     assert_resume_namespace(args.output_dir)
-    runtime_freeze = load_runtime_freeze(args.runtime_freeze)
     budget = load_budget(args.budget_freeze, args.track, args.input)
+    runtime_freeze = load_runtime_freeze(
+        args.runtime_freeze,
+        expected_q0_max_output_tokens=budget["frozen_max_tokens"],
+    )
     items = load_items(args.input, args.track, budget["frozen_max_tokens"])
     if args.mode == "formal" and (
         any(item.task_type != "single_api_recommendation" for item in items)

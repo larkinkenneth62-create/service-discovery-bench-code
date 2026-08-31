@@ -29,6 +29,22 @@ Q0_CONTRACTS_PER_SLOT = 1
 Q0_EXPECTED_REQUESTS = Q0_ROUNDS * Q0_KEY_SLOTS * Q0_CONTRACTS_PER_SLOT
 
 
+def q0_request_contract(max_tokens: int) -> dict[str, Any]:
+    return {
+        "stream": True,
+        "stream_options_include_usage": True,
+        "response_format": "dynamic_strict_combined_json_schema_with_candidate_enum",
+        "temperature": 0,
+        "top_p": 1,
+        "n": 1,
+        "seed": 0,
+        "enable_thinking": True,
+        "preserve_thinking": True,
+        "max_tokens": max_tokens,
+        "max_attempts": R.MAX_ATTEMPTS,
+    }
+
+
 def _case(
     *,
     round_index: int,
@@ -39,6 +55,7 @@ def _case(
     query: str,
     documents: list[dict[str, str]],
     contract: str,
+    max_tokens: int,
 ) -> Any:
     candidate_ids = [item["candidate_id"] for item in documents]
     variant = f"r{round_index}-s{slot_index}-{name}"
@@ -49,7 +66,7 @@ def _case(
         candidate_documents=documents,
         candidate_ids=candidate_ids,
         contract=contract,
-        max_tokens=1024,
+        max_tokens=max_tokens,
     )
     return R.RequestItem(
         request_id=f"synthetic-q0-{variant}",
@@ -65,7 +82,7 @@ def _case(
     )
 
 
-def synthetic_cases(round_index: int = 1, slot_index: int = 1) -> list[tuple[str, Any]]:
+def synthetic_cases(*, round_index: int, slot_index: int, max_tokens: int) -> list[tuple[str, Any]]:
     prefix = f"synthetic-r{round_index}-s{slot_index}"
     documents = [
         {"candidate_id": f"{prefix}-lookup", "document": "Look up a synthetic account by its identifier."},
@@ -87,6 +104,7 @@ def synthetic_cases(round_index: int = 1, slot_index: int = 1) -> list[tuple[str
                 query="Look up an account, then return both its current balance and transaction history.",
                 documents=documents,
                 contract=R.CONTRACTS.RANKING_AND_SELECTED_SET_V1_10,
+                max_tokens=max_tokens,
             ),
         ),
     ]
@@ -101,9 +119,10 @@ def _run_slot(
     round_index: int,
     slot_index: int,
     concurrency_mode: str,
+    max_tokens: int,
 ) -> list[dict[str, Any]]:
     slot_dir = root / f"round-{round_index}" / f"slot-{slot_index}"
-    cases = synthetic_cases(round_index, slot_index)
+    cases = synthetic_cases(round_index=round_index, slot_index=slot_index, max_tokens=max_tokens)
     runner = R.SelectionRunner(base_url, [key], slot_dir, 1, runtime_provenance)
     try:
         runner.run([item for _, item in cases], "diagnostic")
@@ -148,6 +167,7 @@ def _run_slot(
             "raw_sse_events_sha256": row.get("raw_sse_events_sha256"),
             "response_path": f"round-{round_index}/slot-{slot_index}/{row.get('response_path')}" if row.get("response_path") else None,
             "response_sha256": row.get("response_sha256"),
+            "max_output_tokens_requested": row.get("max_output_tokens_requested"),
         })
     return results
 
@@ -227,10 +247,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Q0 combined-contract preflight for Qwen3.8 Single API Correction V1.10")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--runtime-freeze", type=Path, required=True)
+    parser.add_argument("--budget-freeze", type=Path, required=True)
+    parser.add_argument("--source-manifest", type=Path, required=True)
     args = parser.parse_args()
-    if not args.runtime_freeze.is_file():
-        raise SystemExit("runtime freeze must exist")
-    runtime_provenance = R.load_runtime_freeze(args.runtime_freeze)
+    if not args.runtime_freeze.is_file() or not args.budget_freeze.is_file() or not args.source_manifest.is_file():
+        raise SystemExit("runtime freeze, budget freeze, and source manifest must exist")
+    budget = R.load_budget(args.budget_freeze, "native", args.source_manifest)
+    max_tokens = budget["frozen_max_tokens"]
+    runtime_provenance = {
+        **R.load_runtime_freeze(
+            args.runtime_freeze,
+            expected_q0_max_output_tokens=max_tokens,
+        ),
+        **budget,
+    }
     base_url = os.environ.get("SDB_QWEN_BASE_URL", "").strip()
     if not base_url:
         raise SystemExit("SDB_QWEN_BASE_URL is required")
@@ -255,6 +285,7 @@ def main() -> None:
             round_index=1,
             slot_index=slot_index,
             concurrency_mode="serial_global_1",
+            max_tokens=max_tokens,
         ))
 
     # Round 2 is four-way concurrent, with one request per key.
@@ -270,6 +301,7 @@ def main() -> None:
                     round_index=round_index,
                     slot_index=slot_index,
                     concurrency_mode="concurrent_global_4",
+                    max_tokens=max_tokens,
                 )
                 for slot_index, key in enumerate(keys, 1)
             ]
@@ -296,19 +328,7 @@ def main() -> None:
         "required_key_slots": Q0_KEY_SLOTS,
         "required_contracts": [R.CONTRACTS.RANKING_AND_SELECTED_SET_V1_10],
         "concurrency_schedule": {"round_1": "serial_global_1", "round_2": "concurrent_global_4"},
-        "request_contract": {
-            "stream": True,
-            "stream_options_include_usage": True,
-            "response_format": "dynamic_strict_combined_json_schema_with_candidate_enum",
-            "temperature": 0,
-            "top_p": 1,
-            "n": 1,
-            "seed": 0,
-            "enable_thinking": True,
-            "preserve_thinking": True,
-            "max_tokens": 1024,
-            "max_attempts": R.MAX_ATTEMPTS,
-        },
+        "request_contract": q0_request_contract(max_tokens),
         "q0_gate": gate,
         **runtime_provenance,
         "runner_sha256": R.sha256_file(Path(__file__).with_name("run_qwen38_native_single_api_correction_v1_10.py")),

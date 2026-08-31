@@ -11,6 +11,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 CODE = ROOT / "experiments" / "llm_v0_2_qwen38_native_single_api_correction_v1_10" / "code"
+SCHEMAS = ROOT / "experiments" / "llm_v0_2_qwen38_native_single_api_correction_v1_10" / "schemas"
 
 
 def load(name: str, path: Path):
@@ -24,6 +25,7 @@ def load(name: str, path: Path):
 
 contracts = load("sdb_contracts_v1_10_test", CODE / "output_contracts_v1_10.py")
 runner = load("sdb_runner_v1_10_test", CODE / "run_qwen38_native_single_api_correction_v1_10.py")
+q0 = load("sdb_q0_v1_10_test", CODE / "run_q0_single_api_correction_v1_10.py")
 scorer = load("sdb_scorer_v1_10_test", ROOT / "scripts" / "evaluation" / "score_single_api_correction_v1_10.py")
 
 
@@ -144,3 +146,84 @@ def test_historical_mixed_contract_is_labeled_and_not_primary():
     comparison = scorer.aggregate(corrected, old)["comparison"][0]
     assert comparison["old_contract"] == "V1.9_HISTORICAL_MIXED_CONTRACT_DIAGNOSTIC"
     assert comparison["new_macro_6_exact_task_success"] == 1.0
+
+
+def test_r02_all_eight_q0_payloads_and_report_use_frozen_5924_budget():
+    items = [
+        item
+        for round_index in range(1, 3)
+        for slot_index in range(1, 5)
+        for _, item in q0.synthetic_cases(
+            round_index=round_index,
+            slot_index=slot_index,
+            max_tokens=5924,
+        )
+    ]
+    assert len(items) == 8
+    assert {item.payload["max_tokens"] for item in items} == {5924}
+    assert q0.q0_request_contract(5924)["max_tokens"] == 5924
+
+
+def test_r02_q0_changes_only_budget_not_visible_request_contract():
+    _, aligned = q0.synthetic_cases(round_index=1, slot_index=1, max_tokens=5924)[0]
+    old = dict(aligned.payload)
+    old["max_tokens"] = 1024
+    new = dict(aligned.payload)
+    old_budget = old.pop("max_tokens")
+    new_budget = new.pop("max_tokens")
+    assert (old_budget, new_budget) == (1024, 5924)
+    assert old == new
+
+
+def test_r02_runtime_budget_mismatch_rejected_and_alignment_passes():
+    runtime = SCHEMAS / "QWEN38_SINGLE_API_CORRECTION_RUNTIME_FREEZE_V1_10_R02_TEMPLATE.json"
+    with pytest.raises(SystemExit):
+        runner.load_runtime_freeze(runtime, expected_q0_max_output_tokens=1024)
+    provenance = runner.load_runtime_freeze(runtime, expected_q0_max_output_tokens=5924)
+    assert provenance["q0_max_output_tokens"] == 5924
+    assert provenance["runtime_patch_id"] == runner.RUNTIME_PATCH_ID
+
+
+def test_r02_budget_binding_preserves_formal_budget(tmp_path: Path):
+    source = tmp_path / "source.jsonl"
+    source.write_text("{}\n", encoding="utf-8")
+    source_hash = runner.sha256_file(source)
+    budget_path = tmp_path / "budget.json"
+    budget_path.write_text(json.dumps({
+        "status": "PASS",
+        "model": runner.MODEL,
+        "experiment_revision": runner.REVISION,
+        "token_counter_revision": runner.TOKEN_BUDGET_COUNTER_REVISION,
+        "tracks": {"native": {
+            "frozen_max_tokens": 5924,
+            "allowed_source_manifest_sha256": [source_hash],
+        }},
+    }), encoding="utf-8")
+    budget = runner.load_budget(budget_path, "native", source)
+    assert budget["frozen_max_tokens"] == 5924
+    assert budget["source_manifest_sha256"] == source_hash
+
+
+def test_r02_q0_six_of_eight_still_fails_original_gate():
+    rows = []
+    for round_index in range(1, 3):
+        for slot_index in range(1, 5):
+            succeeded = not (round_index == 2 and slot_index in {3, 4})
+            rows.append({
+                "round": round_index,
+                "key_slot": slot_index,
+                "output_contract": runner.CONTRACTS.RANKING_AND_SELECTED_SET_V1_10,
+                "request_sha256": f"sha-{round_index}-{slot_index}",
+                "status": "succeeded" if succeeded else "parse_failure",
+                "http_status": 200,
+                "terminal_event_received": True,
+                "done_received": True,
+                "finish_reason": "stop",
+                "response_model": runner.MODEL,
+                "response_format_type": "json_schema",
+                "response_schema_strict": True,
+            })
+    result = q0.evaluate_q0_results(rows)
+    assert result["status"] == "FAIL"
+    assert result["hard_transport_gate_pass"] is True
+    assert result["format_feasibility_gate_pass"] is False
