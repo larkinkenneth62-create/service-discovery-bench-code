@@ -13,7 +13,7 @@ ServiceDiscoveryBench v0.2.0 defines six task types and a frozen 4,798-row Nativ
 | Task | Target | V1.5 output |
 |---|---|---|
 | Single Service | Service | Top-5 ranking |
-| Single API | API | Top-5 ranking |
+| Single API | API | Top-5 ranking plus independent minimal sufficient selected set |
 | Multi Service | Service | Minimal sufficient selected set |
 | Multi API | API | Minimal sufficient selected set |
 | Composable Service | Service | Minimal sufficient selected set |
@@ -28,6 +28,8 @@ ServiceDiscoveryBench v0.2.0 defines six task types and a frozen 4,798-row Nativ
 | Unified | Retriever-assisted LLM setting | Deferred from Qwen3.8 Structured Selection V1.9 |
 
 The registered paper retriever is `BGE_DENSE_V2@200`. The current independent LLM experiment revision is `QWEN38_SSE_STRUCTURED_SELECTION_MODEL_FAILURE_ACCOUNTING_V1_9`, using the unchanged Selection V1.5 visible prompt, parser, scorer, and output semantics. The reasoning channel is optional audit metadata and is never scored. The complete `content` field must pass the strict Selection V1.5 parser; invalid model content is a non-retryable `parse_failure`, retained in the denominator and scored zero. A per-request strict JSON Schema is requested but not assumed to be enforced. Qwen3.6 V1.4/V1.5 and Qwen3.8 V1.6–V1.8 rows cannot be resumed or reused.
+
+DeepSeek V4 Flash V2.2 is a separate full six-task experiment under `experiments/llm_v0_2_deepseek_v4_flash_structured_selection_v2_2/`. It has its own provider configuration, credentials, runtime freeze, Q0/Dev/formal result namespace, and full-track scorer. It never resumes, merges, or scores Qwen rows. Its Chat Completions adapter uses `thinking.type=enabled`, `reasoning_effort=high`, and `response_format.type=json_object`, followed by the same strict local task validation. Thinking-mode sampling parameters are not sent because they are inapplicable.
 
 ## Installation
 
@@ -62,11 +64,21 @@ SDB_QWEN_API_KEY_03
 SDB_QWEN_API_KEY_04
 ```
 
+DeepSeek uses only its independent variables:
+
+```text
+SDB_DEEPSEEK_BASE_URL
+SDB_DEEPSEEK_MODEL
+SDB_DEEPSEEK_API_KEY
+```
+
 No values belong in Git.
 
 ## Canonical entry points
 
 - Current Qwen3.8 runner: `experiments/llm_v0_2_qwen38_sse_structured_selection_v1_9/code/run_qwen38_sse_structured_selection_v1_9.py`
+- DeepSeek V4 Flash V2.2 runner: `experiments/llm_v0_2_deepseek_v4_flash_structured_selection_v2_2/code/run_deepseek_v4_flash_v2_2.py`
+- DeepSeek V4 Flash V2.2 full-track scorer: `scripts/evaluation/score_deepseek_full_v2_2.py`
 - Current Qwen parsers: `experiments/llm_v0_2_qwen38_sse_structured_selection_v1_9/code/output_contracts_v1_5.py`
 - LLM scoring: `scripts/evaluation/score_native_machine_selection_v1_5.py`
 - LLM result bundle: `scripts/release/build_qwen38_structured_native_machine_bundle_v1_9.py`

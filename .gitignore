@@ -15,7 +15,12 @@ downloads/
 archive/
 releases/
 experiments/
+!experiments/
+experiments/*
+!experiments/llm_v0_2_deepseek_v4_flash_structured_selection_v2_2/
+!experiments/llm_v0_2_deepseek_v4_flash_structured_selection_v2_2/**
 tmp/
+runtime_tmp/
 *.zip
 *.7z
 *.tar

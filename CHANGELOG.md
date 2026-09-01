@@ -1,5 +1,13 @@
 # Changelog
 
+## DeepSeek V4 Flash V2.2 — independent full six-task route
+
+- Add a new DeepSeek-only experiment namespace without modifying or resuming the Qwen runners or outputs.
+- Adapt Chat Completions to `thinking.type=enabled`, `reasoning_effort=high`, and JSON Object mode; omit inapplicable thinking-mode sampling parameters and validate all task fields locally.
+- Add one hash-bound budget registry for Q0, Dev, and formal execution; six-request three-contract Q0; 60-row six-task Dev gate; and exact 197/4,798 formal guards.
+- Add an independent full-track scorer. It rejects Qwen rows and never splices old-provider predictions into DeepSeek results.
+- Add offline request/parser/scorer linkage tests, including a six-API Single API case where exact-set success—not first-ranked hit—is primary.
+
 ## V1.10 R02 — Q0 budget alignment
 
 - Align the synthetic Q0 `max_tokens` with the existing frozen 5,924-token formal budget; the previous Q0 used 1,024 and remains an archived failed run.
