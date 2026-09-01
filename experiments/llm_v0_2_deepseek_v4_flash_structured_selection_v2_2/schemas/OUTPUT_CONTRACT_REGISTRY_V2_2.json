@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "contracts": {
+    "TOP5_RANKING_V1": ["single_service_discovery", "machine"],
+    "RANKING_AND_SELECTED_SET_V1_10": ["single_api_recommendation"],
+    "SELECTED_SET_V1": ["multi_service_discovery", "multi_api_recommendation", "composable_service_discovery", "composable_api_recommendation"]
+  },
+  "single_api_primary_success": "selected_candidate_ids exactly matches one complete acceptable Gold alternative",
+  "acceptable_gold_sets": "outer OR / inner AND; never union",
+  "test_gold_cardinality_visible_to_model": false
+}

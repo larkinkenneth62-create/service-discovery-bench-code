@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "provider": "deepseek",
+  "experiment_revision": "DEEPSEEK_V4_FLASH_FULL_SIX_TASK_V2_2",
+  "served_model_id": "deepseek-v4-flash",
+  "model_version_mapping": "DeepSeek-V4-Flash-0731",
+  "endpoint_in_repository": false,
+  "thinking": {"type": "enabled"},
+  "reasoning_effort": "high",
+  "response_format": {"type": "json_object"},
+  "sampling_parameters": "NOT_APPLICABLE_IN_THINKING_MODE_AND_NOT_SENT",
+  "reasoning_channel_policy": "saved_separately_not_concatenated_into_answer_not_scored",
+  "content_policy": "full_message_strict_local_contract_or_parse_failure",
+  "retry_policy": "transport_timeout_retryable; model_format_failure_non_retryable",
+  "credential_environment": "SDB_DEEPSEEK_API_KEY",
+  "base_url_environment": "SDB_DEEPSEEK_BASE_URL",
+  "result_namespace": "deepseek_only_no_qwen_resume_or_output_reuse"
+}
