@@ -9,5 +9,7 @@
 | Result validation | `build_llm_native_machine_bundle_v1_5.py` | runtime provenance | run summaries and score tables | manifest, checksums, latest result | Code public; bundle private |
 | Single API contract correction | `experiments/llm_v0_2_qwen38_native_single_api_correction_v1_10/` | combined contract and V1.10 runtime freeze | filtered 3,043-row request manifest | statuses and combined predictions | Code public; rows/results private |
 | Corrected Native scoring | `scripts/evaluation/score_single_api_correction_v1_10.py` | exact-task aggregation | V1.9 retained rows plus V1.10 Single API outputs | corrected six-task and comparison tables | Code public; tables private |
+| DeepSeek V4 Flash Native/Machine | `experiments/llm_v0_2_deepseek_v4_flash_structured_selection_v2_2/` | independent V2.2 runtime, budget, and three output contracts | frozen DeepSeek-visible manifests | DeepSeek-only statuses and parsed predictions | Code public; rows/results private |
+| DeepSeek full-track scoring | `scripts/evaluation/score_deepseek_full_v2_2.py` | exact-task six-task aggregation | one complete DeepSeek Machine or Native run plus its Gold manifest | independent DeepSeek score tables | Code public; tables pending run |
 
 No numeric model result is claimed by this map before the corresponding private run passes its gate.
