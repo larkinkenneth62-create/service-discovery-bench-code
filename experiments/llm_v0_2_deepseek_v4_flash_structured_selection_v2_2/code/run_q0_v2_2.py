@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Any
+
+
+def _load_runner() -> Any:
+    path = Path(__file__).with_name("run_deepseek_v4_flash_v2_2.py")
+    spec = importlib.util.spec_from_file_location("sdb_deepseek_v2_2_q0_runner", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load runner: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+R = _load_runner()
+CONTRACTS = (R.CONTRACTS.TOP5_RANKING_V1, R.CONTRACTS.SELECTED_SET_V1, R.CONTRACTS.RANKING_AND_SELECTED_SET_V1_10)
+
+
+def synthetic_cases(max_tokens: int) -> list[R.RequestItem]:
+    cases: list[R.RequestItem] = []
+    specifications = [
+        (R.CONTRACTS.TOP5_RANKING_V1, "single_service_discovery", "service", "Find the service that translates text."),
+        (R.CONTRACTS.SELECTED_SET_V1, "multi_api_recommendation", "api", "Select lookup and balance APIs."),
+        (R.CONTRACTS.RANKING_AND_SELECTED_SET_V1_10, "single_api_recommendation", "api", "Use lookup, balance, history, profile, alerts, and audit APIs."),
+    ]
+    for round_index in (1, 2):
+        for contract, task, target, query in specifications:
+            prefix = f"q0-r{round_index}-{contract.lower()}"
+            documents = [
+                {"candidate_id": f"{prefix}-{name}", "document": description}
+                for name, description in (
+                    ("lookup", "Look up an account."),
+                    ("balance", "Return current balance."),
+                    ("history", "Return transaction history."),
+                    ("profile", "Return account profile."),
+                    ("alerts", "Return account alerts."),
+                    ("audit", "Return audit events."),
+                    ("translate", "Translate text."),
+                )
+            ]
+            ids = [row["candidate_id"] for row in documents]
+            payload = R.build_payload(query=query, task_type=task, prediction_target=target, candidate_documents=documents, candidate_ids=ids, contract=contract, max_tokens=max_tokens)
+            cases.append(R.RequestItem(prefix, "smoke", task, target, ids, contract, payload, R.sha256_text(prefix)))
+    return cases
+
+
+def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    counts = {status: sum(row.get("status") == status for row in rows) for status in ("succeeded", "parse_failure", "infra_error", "api_error")}
+    per_contract = {contract: sum(row.get("output_contract") == contract and row.get("status") == "succeeded" for row in rows) for contract in CONTRACTS}
+    passed = (len(rows) == 6 and counts["infra_error"] == 0 and counts["api_error"] == 0 and all(row.get("status") in {"succeeded", "parse_failure"} and row.get("terminal_event_received") is True and row.get("done_received") is True for row in rows) and all(value >= 1 for value in per_contract.values()))
+    return {"status": "PASS" if passed else "FAIL", "terminal_rows": len(rows), "status_counts": counts, "per_contract_strict_parse": per_contract, "thresholds": {"requests": 6, "requests_per_contract": 2, "min_strict_parse_per_contract": 1, "unresolved_infrastructure_or_api_allowed": 0}}
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="DeepSeek V4 Flash V2.2 six-request synthetic Q0")
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--budget-freeze", type=Path, required=True)
+    parser.add_argument("--runtime-freeze", type=Path, required=True)
+    parser.add_argument("--native-source-manifest", type=Path, required=True)
+    args = parser.parse_args()
+    R.assert_independent_namespace(args.output_dir)
+    if args.output_dir.exists() and any(args.output_dir.iterdir()):
+        raise SystemExit("Q0 output directory must be empty")
+    base_url = os.environ.get(R.BASE_URL_ENV_NAME, "").strip()
+    if not base_url:
+        raise SystemExit(f"{R.BASE_URL_ENV_NAME} is required")
+    budget = R.load_budget(args.budget_freeze, "native", args.native_source_manifest)
+    provenance = {"model": R.MODEL, **R.load_runtime_freeze(args.runtime_freeze), **budget}
+    runner = R.DeepSeekRunner(base_url=base_url, key=R.load_key(), output_dir=args.output_dir, concurrency=1, provenance=provenance)
+    items = synthetic_cases(budget["frozen_max_tokens"])
+    runner.run(items, "diagnostic")
+    report = evaluate(R.read_jsonl(args.output_dir / "REQUEST_STATUS.jsonl"))
+    R.atomic_json(args.output_dir / "Q0_REPORT.json", report)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    raise SystemExit(0 if report["status"] == "PASS" else 2)
+
+
+if __name__ == "__main__":
+    main()
