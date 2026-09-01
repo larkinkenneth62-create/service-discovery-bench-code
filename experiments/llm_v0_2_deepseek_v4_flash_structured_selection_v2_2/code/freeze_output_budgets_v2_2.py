@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -14,8 +16,19 @@ SAFETY_MARGIN_TOKENS = 64
 REASONING_ALLOWANCE_TOKENS = 4096
 
 
-def stable_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+def _load_size_utils() -> Any:
+    path = Path(__file__).with_name("contract_size_utils_v2_2.py")
+    spec = importlib.util.spec_from_file_location("sdb_deepseek_contract_sizes_v2_2_budget", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load contract-size utilities: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+SIZE = _load_size_utils()
+stable_json = SIZE.stable_json
 
 
 def sha256_file(path: Path) -> str:
@@ -50,24 +63,8 @@ def contract(row: dict[str, Any], track: str) -> str:
     raise ValueError(f"unregistered task type: {task}")
 
 
-def array_bound(field: str, ids: list[str]) -> int:
-    prefix = stable_json({field: []})[:-2]
-    return len(prefix.encode("utf-8")) + len("]}".encode("utf-8")) + sum(len(stable_json(value).encode("utf-8")) for value in ids) + max(0, len(ids) - 1)
-
-
 def answer_bound(row: dict[str, Any], track: str) -> int:
-    ids = candidate_ids(row)
-    current = contract(row, track)
-    ranked_ids = sorted(ids, key=lambda value: (-len(stable_json(value).encode("utf-8")), value))[: min(5, len(ids))]
-    ranked = array_bound("ranked_candidate_ids", ranked_ids)
-    selected = array_bound("selected_candidate_ids", ids)
-    if current == "TOP5_RANKING_V1":
-        return ranked
-    if current == "SELECTED_SET_V1":
-        return selected
-    # Combining separately bounded objects overcounts the shared braces and is
-    # intentionally conservative. It covers a Top-5 plus every legal pool ID.
-    return ranked + selected + 8
+    return SIZE.legal_answer_bound_bytes(contract(row, track), candidate_ids(row))
 
 
 def freeze(native: Path, machine: Path, smoke: Path) -> dict[str, Any]:

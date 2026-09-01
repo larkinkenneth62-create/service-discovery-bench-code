@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://service-discovery-bench.example/schemas/SCORING_METADATA_FIELD_MAP_SCHEMA_V2_2.json",
+  "title": "DeepSeek V2.2 private scoring metadata field map",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_dataset",
+    "core_expansion",
+    "evidence_tier",
+    "pairing_id"
+  ],
+  "properties": {
+    "source_dataset": {"type": ["string", "null"], "minLength": 1},
+    "core_expansion": {"type": ["string", "null"], "minLength": 1},
+    "evidence_tier": {"type": ["string", "null"], "minLength": 1},
+    "pairing_id": {"type": ["string", "null"], "minLength": 1}
+  }
+}

@@ -1,5 +1,14 @@
 # Changelog
 
+## DeepSeek V4 Flash V2.2 R2 — stage gates, accounting, and paper scoring
+
+- Enforce Q0 → Smoke → Machine → Native prerequisites in code with SHA-256-bound reports before network access.
+- Classify provider finish reasons separately from model-format failures, retain complete response evidence, and record stable response/backend metadata without publishing endpoints.
+- Replace candidate-count smoke coverage with exact maximum serialized-request and legal-answer request identities for every contract.
+- Bind scoring to source-row, manifest, candidate-count, model, git, runtime, budget, runner, parser, and endpoint provenance.
+- Add six-task equal-weight Macro-6, five-task equal-weight set-selection macro, row-weighted micro tables, explicit paired comparison, and a checksummed private result-bundle builder.
+- Add offline synthetic coverage only. No live R2 Q0, Dev, Machine, or Native request was run by this change.
+
 ## DeepSeek V4 Flash V2.2 — independent full six-task route
 
 - Add a new DeepSeek-only experiment namespace without modifying or resuming the Qwen runners or outputs.

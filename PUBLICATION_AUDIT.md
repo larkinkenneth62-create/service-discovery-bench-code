@@ -1,17 +1,17 @@
 # Publication audit
 
-- Audit date: 2026-08-25
-- Baseline commit: `3ca6c7b02bac91d3e90502bc6a1ee68a8ca42d8d`
-- Audited implementation commit: `bab1ef6`
-- Target branch: `fix/qwen-selection-contract-v1.5`
+- Audit date: 2026-09-01
+- Baseline commit: `86a1e73123f80aa88c2d651559b2bf5571dd8c95`
+- Audited implementation: DeepSeek V2.2 R2 working tree; final commit is recorded in the handoff package
+- Target branch: `fix/deepseek-v4-flash-v2.2-r2-gates-accounting-scoring`
 - Scope: sanitized code-only mirror
 
 ## Local validation
 
-- `python -m compileall src scripts experiments`: PASS
-- Full public pytest: 165 passed, 2 skipped because the corresponding private generated fixtures are intentionally absent
-- V1.5 contract/formal-guard tests: 34 passed
-- Synthetic manifest → payload → SSE → parser → score → bundle: PASS
+- `python -m compileall src scripts experiments tests`: PASS
+- Full public pytest: 356 passed, 2 skipped because the corresponding private generated fixtures are intentionally absent
+- DeepSeek V2.2 R2 focused tests: 75 passed
+- Synthetic stage gates, finish accounting, exact longest-request coverage, scorer, paired comparison, and bundle: PASS
 - `git diff --check`: PASS
 
 ## Executable publication audit
@@ -29,7 +29,7 @@ large files = 0
 publication audit status = PASS
 ```
 
-The public V1.4 diagnostic copy retains historical logic but its temporary endpoint literals were sanitized after the private run was stopped. The private frozen V1.4 artifacts were not modified. V1.5 has no default endpoint and requires `SDB_QWEN_BASE_URL` at runtime.
+The DeepSeek V2.2 R2 implementation stores only an endpoint SHA-256 and requires provider configuration through environment variables at runtime. No live R2 Q0, Dev, Machine, or Native request was made during this code update.
 
 ## Deliberate omissions
 

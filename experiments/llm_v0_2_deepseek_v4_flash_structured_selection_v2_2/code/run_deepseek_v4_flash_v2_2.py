@@ -22,6 +22,7 @@ import httpx
 MODEL = "deepseek-v4-flash"
 MODEL_VERSION = "DeepSeek-V4-Flash-0731"
 REVISION = "DEEPSEEK_V4_FLASH_FULL_SIX_TASK_V2_2"
+IMPLEMENTATION_REVISION = "DEEPSEEK_V4_FLASH_V2_2_R2_GATE_ACCOUNTING"
 TOKEN_COUNTER_REVISION = "UTF8_BYTE_UPPER_BOUND_PLUS_REASONING_4096_V2_2"
 KEY_ENV_NAME = "SDB_DEEPSEEK_API_KEY"
 BASE_URL_ENV_NAME = "SDB_DEEPSEEK_BASE_URL"
@@ -68,8 +69,22 @@ def _load_contracts() -> Any:
 CONTRACTS = _load_contracts()
 
 
+def _load_size_utils() -> Any:
+    path = Path(__file__).with_name("contract_size_utils_v2_2.py")
+    spec = importlib.util.spec_from_file_location("sdb_deepseek_contract_sizes_v2_2_runner", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load contract-size utilities: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+SIZE = _load_size_utils()
+
+
 def stable_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return SIZE.stable_json(value)
 
 
 def sha256_text(value: str) -> str:
@@ -139,7 +154,7 @@ def assert_independent_namespace(output_dir: Path) -> None:
     if "deepseek" not in normalized:
         raise SystemExit("DeepSeek output path must contain an explicit deepseek namespace")
     for row in read_jsonl(output_dir / "REQUEST_STATUS.jsonl"):
-        if row.get("experiment_revision") != REVISION or row.get("provider") != "deepseek":
+        if row.get("experiment_revision") != REVISION or row.get("implementation_revision") != IMPLEMENTATION_REVISION or row.get("provider") != "deepseek":
             raise SystemExit("output directory contains results from another experiment/provider")
 
 
@@ -153,7 +168,7 @@ def validate_resume_audit(output_dir: Path) -> None:
         raise SystemExit("DeepSeek resume statuses exist without an attempt ledger")
     events: dict[tuple[str, int], list[str]] = {}
     for line_number, row in enumerate(ledger, 1):
-        if row.get("provider") != "deepseek" or row.get("experiment_revision") != REVISION:
+        if row.get("provider") != "deepseek" or row.get("experiment_revision") != REVISION or row.get("implementation_revision") != IMPLEMENTATION_REVISION:
             raise SystemExit(f"attempt ledger provider/revision mismatch at line {line_number}")
         request_id = row.get("request_id")
         attempt = row.get("attempt")
@@ -256,6 +271,10 @@ class RequestItem:
     contract: str
     payload: dict[str, Any]
     source_row_sha256: str
+    serialized_request_bytes: int = 0
+    user_message_bytes: int = 0
+    candidate_document_bytes: int = 0
+    legal_answer_bound_bytes: int = 0
 
     @property
     def request_sha256(self) -> str:
@@ -278,9 +297,29 @@ def load_items(path: Path, track: str, max_tokens: int) -> list[RequestItem]:
             raise ValueError(f"invalid request metadata at line {line_number}")
         contract = CONTRACTS.contract_for(mapping_track, task_type)
         payload = build_payload(query=query, task_type=task_type, prediction_target=prediction_target, candidate_documents=documents, candidate_ids=candidate_ids, contract=contract, max_tokens=max_tokens)
-        if len(stable_json(payload).encode("utf-8")) > 8 * 1024 * 1024:
-            raise ValueError(f"request body exceeds 8 MiB at line {line_number}")
-        items.append(RequestItem(request_id, track, task_type, prediction_target, candidate_ids, contract, payload, sha256_text(stable_json(row))))
+        serialized_request_bytes = len(stable_json(payload).encode("utf-8"))
+        input_limit = 8 * 1024 * 1024
+        if serialized_request_bytes > input_limit:
+            raise ValueError(
+                f"request body exceeds 8 MiB: request_id={request_id}; "
+                f"line={line_number}; actual_bytes={serialized_request_bytes}; limit_bytes={input_limit}"
+            )
+        items.append(
+            RequestItem(
+                request_id,
+                track,
+                task_type,
+                prediction_target,
+                candidate_ids,
+                contract,
+                payload,
+                sha256_text(stable_json(row)),
+                serialized_request_bytes,
+                len(payload["messages"][1]["content"].encode("utf-8")),
+                len(stable_json(documents).encode("utf-8")),
+                SIZE.legal_answer_bound_bytes(contract, candidate_ids),
+            )
+        )
     if len({item.request_id for item in items}) != len(items):
         raise ValueError("duplicate request ID in manifest")
     return items
@@ -299,6 +338,29 @@ class StreamOutcome:
     retryable: bool = False
 
 
+def classify_finish_reason(finish_reason: str | None) -> tuple[str | None, str | None, bool]:
+    mapping: dict[str, tuple[str | None, str | None, bool]] = {
+        "stop": (None, None, False),
+        "insufficient_system_resource": ("infra_error", "INSUFFICIENT_SYSTEM_RESOURCE", True),
+        "length": ("api_error", "OUTPUT_BUDGET_EXHAUSTED", False),
+        "content_filter": ("api_error", "CONTENT_FILTERED", False),
+        "tool_calls": ("api_error", "UNEXPECTED_TOOL_CALL_FINISH", False),
+    }
+    return mapping.get(finish_reason, ("api_error", "UNSUPPORTED_FINISH_REASON", False))
+
+
+def capture_stable_metadata(state: dict[str, Any], field: str, incoming: Any) -> str | None:
+    if incoming is None:
+        return None
+    current = state.get(field)
+    if current is None:
+        state[field] = incoming
+        return None
+    if current == incoming:
+        return None
+    return f"INCONSISTENT_{field.upper()}"
+
+
 def _consume_sse(data: str, state: dict[str, Any]) -> str | None:
     if data == "[DONE]":
         state["done"] = True
@@ -309,7 +371,14 @@ def _consume_sse(data: str, state: dict[str, Any]) -> str | None:
         return "INVALID_SSE_JSON"
     if not isinstance(chunk, dict) or chunk.get("error") is not None:
         return "SSE_ERROR_EVENT"
-    state["model"] = chunk.get("model", state["model"])
+    for state_field, chunk_field in (
+        ("response_id", "id"),
+        ("response_created", "created"),
+        ("system_fingerprint", "system_fingerprint"),
+        ("model", "model"),
+    ):
+        if capture_stable_metadata(state, state_field, chunk.get(chunk_field)) is not None:
+            return "INCONSISTENT_RESPONSE_METADATA"
     if isinstance(chunk.get("usage"), dict):
         state["usage"] = chunk["usage"]
     choices = chunk.get("choices")
@@ -343,7 +412,19 @@ class DeepSeekRunner:
         self.write_lock = threading.Lock()
 
     def send_stream(self, item: RequestItem, raw_sse_path: Path) -> StreamOutcome:
-        state: dict[str, Any] = {"model": None, "content": [], "reasoning": [], "usage": None, "finish_reason": None, "terminal": False, "done": False, "events": 0}
+        state: dict[str, Any] = {
+            "response_id": None,
+            "response_created": None,
+            "system_fingerprint": None,
+            "model": None,
+            "content": [],
+            "reasoning": [],
+            "usage": None,
+            "finish_reason": None,
+            "terminal": False,
+            "done": False,
+            "events": 0,
+        }
         started = time.perf_counter()
         try:
             timeout = httpx.Timeout(connect=CONNECT_TIMEOUT_SECONDS, read=READ_TIMEOUT_SECONDS, write=60.0, pool=60.0)
@@ -370,7 +451,27 @@ class DeepSeekRunner:
         message: dict[str, Any] = {"content": "".join(state["content"])}
         if state["reasoning"]:
             message["reasoning_content"] = "".join(state["reasoning"])
-        final = {"model": state["model"], "choices": [{"message": message, "finish_reason": state["finish_reason"]}], "usage": state["usage"]}
+        final = {
+            "id": state["response_id"],
+            "created": state["response_created"],
+            "model": state["model"],
+            "system_fingerprint": state["system_fingerprint"],
+            "choices": [{"message": message, "finish_reason": state["finish_reason"]}],
+            "usage": state["usage"],
+        }
+        status_domain, error_code, retryable = classify_finish_reason(state["finish_reason"])
+        if error_code is not None:
+            return StreamOutcome(
+                200,
+                final,
+                state["finish_reason"],
+                True,
+                True,
+                state["events"],
+                error_code,
+                f"finish_reason={state['finish_reason']!r} classified as {status_domain}",
+                retryable,
+            )
         return StreamOutcome(200, final, state["finish_reason"], True, True, state["events"])
 
     def run_one(self, item: RequestItem, worker_index: int) -> dict[str, Any]:
@@ -387,12 +488,29 @@ class DeepSeekRunner:
         for attempt in range(1, MAX_ATTEMPTS + 1):
             raw_sse_path = artifact / f"raw_sse_events_attempt_{attempt}.jsonl"
             raw_sse_path.touch(exist_ok=False)
-            append_jsonl(ledger_path, {"provider": "deepseek", "experiment_revision": REVISION, "event": "attempt_started", "request_id": item.request_id, "request_sha256": item.request_sha256, "attempt": attempt, "started_at_utc": utc_now(), "raw_sse_events_path": str(raw_sse_path.relative_to(self.output_dir)).replace("\\", "/")}, self.write_lock)
+            append_jsonl(ledger_path, {"provider": "deepseek", "experiment_revision": REVISION, "implementation_revision": IMPLEMENTATION_REVISION, "event": "attempt_started", "request_id": item.request_id, "request_sha256": item.request_sha256, "attempt": attempt, "started_at_utc": utc_now(), "raw_sse_events_path": str(raw_sse_path.relative_to(self.output_dir)).replace("\\", "/")}, self.write_lock)
+            attempt_started = time.perf_counter()
             outcome = self.send_stream(item, raw_sse_path)
+            latency_seconds = time.perf_counter() - attempt_started
+            response_attempt_path: str | None = None
+            response_attempt_sha256: str | None = None
+            if outcome.final_response is not None:
+                saved_attempt = artifact / f"response_attempt_{attempt}.json"
+                atomic_json(saved_attempt, outcome.final_response)
+                response_attempt_path = str(saved_attempt.relative_to(self.output_dir)).replace("\\", "/")
+                response_attempt_sha256 = sha256_file(saved_attempt)
             retry = bool(outcome.error_code and outcome.retryable and attempt < MAX_ATTEMPTS)
             raw_hash = sha256_file(raw_sse_path)
-            append_jsonl(ledger_path, {"provider": "deepseek", "experiment_revision": REVISION, "event": "attempt_finished", "request_id": item.request_id, "request_sha256": item.request_sha256, "attempt": attempt, "finished_at_utc": utc_now(), "http_status": outcome.http_status, "error_code": outcome.error_code, "retryable": outcome.retryable, "will_retry": retry, "raw_sse_events_path": str(raw_sse_path.relative_to(self.output_dir)).replace("\\", "/"), "raw_sse_events_sha256": raw_hash}, self.write_lock)
-            attempts.append({"attempt": attempt, "http_status": outcome.http_status, "error_code": outcome.error_code, "retryable": outcome.retryable, "will_retry": retry, "raw_sse_events_path": str(raw_sse_path.relative_to(self.output_dir)).replace("\\", "/"), "raw_sse_events_sha256": raw_hash})
+            response = outcome.final_response or {}
+            metadata = {
+                "finish_reason": outcome.finish_reason,
+                "response_model": response.get("model"),
+                "system_fingerprint": response.get("system_fingerprint"),
+                "response_id": response.get("id"),
+                "response_created": response.get("created"),
+            }
+            append_jsonl(ledger_path, {"provider": "deepseek", "experiment_revision": REVISION, "implementation_revision": IMPLEMENTATION_REVISION, "event": "attempt_finished", "request_id": item.request_id, "request_sha256": item.request_sha256, "attempt": attempt, "finished_at_utc": utc_now(), "http_status": outcome.http_status, "error_code": outcome.error_code, "retryable": outcome.retryable, "will_retry": retry, "latency_seconds": latency_seconds, "raw_sse_events_path": str(raw_sse_path.relative_to(self.output_dir)).replace("\\", "/"), "raw_sse_events_sha256": raw_hash, "response_attempt_path": response_attempt_path, "response_attempt_sha256": response_attempt_sha256, **metadata}, self.write_lock)
+            attempts.append({"attempt": attempt, "http_status": outcome.http_status, "error_code": outcome.error_code, "retryable": outcome.retryable, "will_retry": retry, "latency_seconds": latency_seconds, "raw_sse_events_path": str(raw_sse_path.relative_to(self.output_dir)).replace("\\", "/"), "raw_sse_events_sha256": raw_hash, "response_attempt_path": response_attempt_path, "response_attempt_sha256": response_attempt_sha256, **metadata})
             if not retry:
                 break
             time.sleep(RETRY_BACKOFF_SECONDS[attempt - 1])
@@ -401,12 +519,17 @@ class DeepSeekRunner:
             **self.provenance,
             "provider": "deepseek",
             "experiment_revision": REVISION,
+            "implementation_revision": IMPLEMENTATION_REVISION,
             "request_id": item.request_id,
             "track": item.track,
             "task_type": item.task_type,
             "prediction_target": item.prediction_target,
             "output_contract": item.contract,
             "candidate_count": len(item.candidate_ids),
+            "serialized_request_bytes": item.serialized_request_bytes,
+            "user_message_bytes": item.user_message_bytes,
+            "candidate_document_bytes": item.candidate_document_bytes,
+            "legal_answer_bound_bytes": item.legal_answer_bound_bytes,
             "source_row_sha256": item.source_row_sha256,
             "request_sha256": item.request_sha256,
             "requested_model": MODEL,
@@ -428,19 +551,25 @@ class DeepSeekRunner:
             "finish_reason": outcome.finish_reason,
             "sse_event_count": outcome.event_count,
             "response_model": None if outcome.final_response is None else outcome.final_response.get("model"),
+            "response_id": None if outcome.final_response is None else outcome.final_response.get("id"),
+            "response_created": None if outcome.final_response is None else outcome.final_response.get("created"),
+            "system_fingerprint": None if outcome.final_response is None else outcome.final_response.get("system_fingerprint"),
+            "endpoint_sha256": sha256_text(self.base_url.rstrip("/")),
             "usage": None if outcome.final_response is None else outcome.final_response.get("usage"),
+            "latency_seconds": sum(float(attempt_row["latency_seconds"]) for attempt_row in attempts),
             "completed_at_utc": utc_now(),
         }
+        if outcome.final_response is not None:
+            atomic_json(artifact / "response.json", outcome.final_response)
+            base["response_path"] = str((artifact / "response.json").relative_to(self.output_dir)).replace("\\", "/")
         if outcome.error_code:
             return {**base, "status": "infra_error" if outcome.retryable else "api_error", "parse_status": "not_attempted", "error_code": outcome.error_code, "error_message": outcome.error_message}
         assert outcome.final_response is not None
-        atomic_json(artifact / "response.json", outcome.final_response)
-        base["response_path"] = str((artifact / "response.json").relative_to(self.output_dir)).replace("\\", "/")
         model = outcome.final_response.get("model")
         if model not in {MODEL, MODEL_VERSION}:
             return {**base, "status": "api_error", "parse_status": "not_attempted", "error_code": "MODEL_IDENTITY_MISMATCH", "error_message": "response model is outside the frozen alias/version mapping"}
         if outcome.finish_reason != "stop":
-            return {**base, "status": "parse_failure", "parse_status": "invalid", "error_code": "NON_STOP_FINISH_REASON", "error_message": "finish_reason=stop is required"}
+            raise AssertionError("non-stop finish reason reached the local parser")
         if item.contract == CONTRACTS.TOP5_RANKING_V1:
             parsed = CONTRACTS.parse_topk_response(outcome.final_response, item.candidate_ids, min(5, len(item.candidate_ids)))
         elif item.contract == CONTRACTS.SELECTED_SET_V1:
@@ -473,20 +602,94 @@ class DeepSeekRunner:
         rows = [completed[item.request_id] for item in items if item.request_id in completed]
         counts = Counter(row["status"] for row in rows)
         unresolved = counts["infra_error"] + counts["api_error"]
+        track = items[0].track if items else None
+        smoke_gate_details: dict[str, Any] | None = None
+        gate_passed: bool | None = None
         if mode == "diagnostic":
             status = "DIAGNOSTIC_COMPLETE"
         elif mode == "smoke":
             by_task = {task: [row for row in rows if row["task_type"] == task] for task in TASKS}
-            contract_max = {contract: max((row["candidate_count"] for row in rows if row["output_contract"] == contract), default=0) for contract in (CONTRACTS.TOP5_RANKING_V1, CONTRACTS.SELECTED_SET_V1, CONTRACTS.RANKING_AND_SELECTED_SET_V1_10)}
-            gate = (len(rows) == 60 and unresolved == 0 and counts["succeeded"] >= 54 and all(sum(row["status"] == "succeeded" for row in task_rows) >= 8 for task_rows in by_task.values()) and all(any(row["output_contract"] == contract and row["candidate_count"] == maximum and row["status"] == "succeeded" for row in rows) for contract, maximum in contract_max.items()))
-            status = "COMPLETE_ALL_PARSED" if gate and counts["parse_failure"] == 0 else "COMPLETE_WITH_MODEL_FAILURES" if gate else "BLOCKED_DEEPSEEK_DEV_SMOKE"
+            rows_by_id = {row["request_id"]: row for row in rows}
+            max_request: dict[str, dict[str, Any]] = {}
+            max_answer: dict[str, dict[str, Any]] = {}
+            exact_passes: list[bool] = []
+            for contract in (CONTRACTS.TOP5_RANKING_V1, CONTRACTS.SELECTED_SET_V1, CONTRACTS.RANKING_AND_SELECTED_SET_V1_10):
+                contract_items = [item for item in items if item.contract == contract]
+                if not contract_items:
+                    exact_passes.append(False)
+                    continue
+                for destination, field in ((max_request, "serialized_request_bytes"), (max_answer, "legal_answer_bound_bytes")):
+                    selected = sorted(contract_items, key=lambda item: (-getattr(item, field), item.request_id))[0]
+                    row = rows_by_id.get(selected.request_id, {})
+                    passed = row.get("status") == "succeeded" and row.get("finish_reason") == "stop" and row.get("parse_status") == "valid"
+                    destination[contract] = {
+                        "request_id": selected.request_id,
+                        field: getattr(selected, field),
+                        "status": row.get("status"),
+                        "finish_reason": row.get("finish_reason"),
+                        "parse_status": row.get("parse_status"),
+                        "passed": passed,
+                    }
+                    exact_passes.append(passed)
+            per_task_succeeded = {task: sum(row["status"] == "succeeded" for row in task_rows) for task, task_rows in by_task.items()}
+            smoke_gate_details = {
+                "per_task_succeeded": per_task_succeeded,
+                "per_contract_max_request": max_request,
+                "per_contract_max_legal_answer": max_answer,
+            }
+            gate_passed = (
+                len(rows) == EXPECTED_SMOKE_ROWS
+                and unresolved == 0
+                and counts["succeeded"] >= 54
+                and all(value >= 8 for value in per_task_succeeded.values())
+                and len(exact_passes) == 6
+                and all(exact_passes)
+            )
+            status = "COMPLETE_ALL_PARSED" if gate_passed and counts["parse_failure"] == 0 else "COMPLETE_WITH_MODEL_FAILURES" if gate_passed else "BLOCKED_DEEPSEEK_DEV_SMOKE"
         elif unresolved:
             status = "BLOCKED_INFRASTRUCTURE_OR_API"
         elif len(rows) != len(items):
             status = "BLOCKED_INPUT_OR_CONTRACT"
         else:
             status = "COMPLETE_ALL_PARSED" if counts["parse_failure"] == 0 else "COMPLETE_WITH_MODEL_FAILURES"
-        summary = {**self.provenance, "provider": "deepseek", "experiment_revision": REVISION, "status": status, "mode": mode, "requested_rows": len(items), "terminal_rows": len(rows), "status_counts": dict(sorted(counts.items())), "account_scoped_concurrency": self.concurrency, "generated_at_utc": utc_now()}
+        fingerprints = [row.get("system_fingerprint") for row in rows]
+        present_fingerprints = [value for value in fingerprints if isinstance(value, str) and value]
+        missing_fingerprints = len(fingerprints) - len(present_fingerprints)
+        distinct_fingerprints = set(present_fingerprints)
+        if not present_fingerprints:
+            fingerprint_finding = "ALL_MISSING"
+        elif missing_fingerprints:
+            fingerprint_finding = "MIXED_PRESENT_AND_MISSING"
+        elif len(distinct_fingerprints) == 1:
+            fingerprint_finding = "SINGLE_FINGERPRINT"
+        else:
+            fingerprint_finding = "MULTIPLE_FINGERPRINTS"
+        created_values = [row.get("response_created") for row in rows if isinstance(row.get("response_created"), (int, float))]
+        status_counts = {name: counts[name] for name in ("succeeded", "parse_failure", "infra_error", "api_error")}
+        summary = {
+            **self.provenance,
+            "provider": "deepseek",
+            "experiment_revision": REVISION,
+            "implementation_revision": IMPLEMENTATION_REVISION,
+            "status": status,
+            "mode": mode,
+            "track": track,
+            "requested_rows": len(items),
+            "terminal_rows": len(rows),
+            "status_counts": status_counts,
+            "gate_passed": gate_passed,
+            "smoke_gate_details": smoke_gate_details,
+            "account_scoped_concurrency": self.concurrency,
+            "observed_response_models": dict(sorted(Counter(row.get("response_model") for row in rows if row.get("response_model")).items())),
+            "observed_system_fingerprints": dict(sorted(Counter(present_fingerprints).items())),
+            "missing_system_fingerprint_count": missing_fingerprints,
+            "unique_response_id_count": len({row.get("response_id") for row in rows if row.get("response_id") is not None}),
+            "response_created_min": min(created_values) if created_values else None,
+            "response_created_max": max(created_values) if created_values else None,
+            "endpoint_sha256": sha256_text(self.base_url.rstrip("/")),
+            "backend_fingerprint_finding": fingerprint_finding,
+            "generated_at_utc": utc_now(),
+        }
         atomic_json(self.output_dir / "RUN_SUMMARY.json", summary)
         return summary
 
@@ -508,9 +711,10 @@ def load_budget(path: Path, track: str, source: Path) -> dict[str, Any]:
 def load_runtime_freeze(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     expected = {
-        "schema_version": 1,
+        "schema_version": 2,
         "provider": "deepseek",
         "experiment_revision": REVISION,
+        "implementation_revision": IMPLEMENTATION_REVISION,
         "served_model_id": MODEL,
         "model_version_mapping": MODEL_VERSION,
         "endpoint_in_repository": False,
@@ -518,10 +722,164 @@ def load_runtime_freeze(path: Path) -> dict[str, Any]:
         "reasoning_effort": "high",
         "response_format": {"type": "json_object"},
         "sampling_parameters": "NOT_APPLICABLE_IN_THINKING_MODE_AND_NOT_SENT",
+        "stage_gate_policy": "Q0_PASS_THEN_SMOKE_PASS_THEN_MACHINE_COMPLETE_THEN_NATIVE",
+        "finish_reason_accounting": "STOP_PARSE; INSUFFICIENT_RESOURCE_RETRY_INFRA; LENGTH_BUDGET_BLOCK; CONTENT_FILTER_PROVIDER_BLOCK; TOOL_CALLS_BLOCK",
+        "smoke_coverage_policy": "EXACT_MAX_SERIALIZED_REQUEST_AND_EXACT_MAX_LEGAL_ANSWER_PER_CONTRACT",
+        "response_metadata_policy": "CAPTURE_ID_CREATED_MODEL_SYSTEM_FINGERPRINT_ENDPOINT_HASH",
     }
     if any(value.get(key) != expected_value for key, expected_value in expected.items()):
         raise SystemExit("DeepSeek runtime freeze mismatch")
     return {"runtime_freeze_sha256": sha256_file(path), "model_version_mapping": value["model_version_mapping"], "sampling_parameter_policy": value["sampling_parameters"]}
+
+
+def read_json_object(path: Path, label: str) -> dict[str, Any]:
+    if not path.is_file():
+        raise SystemExit(f"BLOCKED_STAGE_PREREQUISITE: missing {label}: {path}")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"BLOCKED_STAGE_PREREQUISITE: invalid {label}: {type(exc).__name__}") from exc
+    if not isinstance(value, dict):
+        raise SystemExit(f"BLOCKED_STAGE_PREREQUISITE: {label} must be a JSON object")
+    return value
+
+
+def _stage_block(message: str) -> None:
+    raise SystemExit(f"BLOCKED_STAGE_PREREQUISITE: {message}")
+
+
+def _status_count(report: dict[str, Any], name: str) -> int:
+    value = report.get("status_counts", {}).get(name, 0)
+    return int(value) if isinstance(value, (int, float)) else -1
+
+
+def validate_q0_report(q0_report: Path, runtime_freeze: Path, budget_freeze: Path) -> dict[str, Any]:
+    value = read_json_object(q0_report, "Q0 report")
+    expected = {
+        "status": "PASS",
+        "provider": "deepseek",
+        "experiment_revision": REVISION,
+        "implementation_revision": IMPLEMENTATION_REVISION,
+        "terminal_rows": 6,
+        "runtime_freeze_sha256": sha256_file(runtime_freeze),
+        "budget_freeze_sha256": sha256_file(budget_freeze),
+    }
+    if any(value.get(field) != expected_value for field, expected_value in expected.items()):
+        _stage_block("Q0 identity, status, row count, or freeze hash mismatch")
+    if _status_count(value, "infra_error") != 0 or _status_count(value, "api_error") != 0:
+        _stage_block("Q0 contains infrastructure or API failures")
+    per_contract = value.get("per_contract_strict_parse")
+    contracts = (CONTRACTS.TOP5_RANKING_V1, CONTRACTS.SELECTED_SET_V1, CONTRACTS.RANKING_AND_SELECTED_SET_V1_10)
+    if not isinstance(per_contract, dict) or any(int(per_contract.get(contract, 0)) < 1 for contract in contracts):
+        _stage_block("Q0 lacks a strict parse for every contract")
+    summary_path = q0_report.parent / "RUN_SUMMARY.json"
+    expected_summary_hash = value.get("diagnostic_run_summary_sha256")
+    if not summary_path.is_file() or expected_summary_hash != sha256_file(summary_path):
+        _stage_block("Q0 diagnostic run summary hash mismatch")
+    native_source_hash = value.get("native_source_manifest_sha256")
+    if not isinstance(native_source_hash, str) or len(native_source_hash) != 64:
+        _stage_block("Q0 native source manifest hash is missing")
+    return value
+
+
+def validate_smoke_summary(
+    smoke_summary: Path,
+    q0_report: Path,
+    runtime_freeze: Path,
+    budget_freeze: Path,
+) -> dict[str, Any]:
+    value = read_json_object(smoke_summary, "Smoke summary")
+    expected = {
+        "provider": "deepseek",
+        "experiment_revision": REVISION,
+        "implementation_revision": IMPLEMENTATION_REVISION,
+        "mode": "smoke",
+        "track": "smoke",
+        "requested_rows": 60,
+        "terminal_rows": 60,
+        "gate_passed": True,
+        "prerequisite_q0_report_sha256": sha256_file(q0_report),
+        "runtime_freeze_sha256": sha256_file(runtime_freeze),
+        "budget_freeze_sha256": sha256_file(budget_freeze),
+    }
+    if value.get("status") not in {"COMPLETE_ALL_PARSED", "COMPLETE_WITH_MODEL_FAILURES"}:
+        _stage_block("Smoke status is not complete")
+    if any(value.get(field) != expected_value for field, expected_value in expected.items()):
+        _stage_block("Smoke summary identity, gate, prerequisite, or freeze hash mismatch")
+    if _status_count(value, "infra_error") != 0 or _status_count(value, "api_error") != 0:
+        _stage_block("Smoke contains infrastructure or API failures")
+    return value
+
+
+def validate_machine_summary(
+    machine_summary: Path,
+    q0_report: Path,
+    smoke_summary: Path,
+    runtime_freeze: Path,
+    budget_freeze: Path,
+) -> dict[str, Any]:
+    value = read_json_object(machine_summary, "Machine summary")
+    expected = {
+        "provider": "deepseek",
+        "experiment_revision": REVISION,
+        "implementation_revision": IMPLEMENTATION_REVISION,
+        "mode": "formal",
+        "track": "machine",
+        "requested_rows": 197,
+        "terminal_rows": 197,
+        "prerequisite_q0_report_sha256": sha256_file(q0_report),
+        "prerequisite_smoke_summary_sha256": sha256_file(smoke_summary),
+        "runtime_freeze_sha256": sha256_file(runtime_freeze),
+        "budget_freeze_sha256": sha256_file(budget_freeze),
+    }
+    if value.get("status") not in {"COMPLETE_ALL_PARSED", "COMPLETE_WITH_MODEL_FAILURES"}:
+        _stage_block("Machine status is not complete")
+    if any(value.get(field) != expected_value for field, expected_value in expected.items()):
+        _stage_block("Machine summary identity, prerequisite, or freeze hash mismatch")
+    if _status_count(value, "infra_error") != 0 or _status_count(value, "api_error") != 0:
+        _stage_block("Machine contains infrastructure or API failures")
+    return value
+
+
+def validate_stage_prerequisites(
+    *,
+    mode: str,
+    track: str,
+    q0_report: Path | None,
+    smoke_summary: Path | None,
+    machine_summary: Path | None,
+    runtime_freeze: Path,
+    budget_freeze: Path,
+) -> dict[str, str]:
+    if mode == "diagnostic":
+        return {}
+    if mode == "smoke":
+        if q0_report is None or smoke_summary is not None or machine_summary is not None:
+            _stage_block("Smoke requires only --q0-report")
+        validate_q0_report(q0_report, runtime_freeze, budget_freeze)
+        return {"prerequisite_q0_report_sha256": sha256_file(q0_report)}
+    if mode == "formal" and track == "machine":
+        if q0_report is None or smoke_summary is None or machine_summary is not None:
+            _stage_block("Formal Machine requires Q0 and Smoke reports only")
+        validate_q0_report(q0_report, runtime_freeze, budget_freeze)
+        validate_smoke_summary(smoke_summary, q0_report, runtime_freeze, budget_freeze)
+        return {
+            "prerequisite_q0_report_sha256": sha256_file(q0_report),
+            "prerequisite_smoke_summary_sha256": sha256_file(smoke_summary),
+        }
+    if mode == "formal" and track == "native":
+        if q0_report is None or smoke_summary is None or machine_summary is None:
+            _stage_block("Formal Native requires Q0, Smoke, and Machine reports")
+        validate_q0_report(q0_report, runtime_freeze, budget_freeze)
+        validate_smoke_summary(smoke_summary, q0_report, runtime_freeze, budget_freeze)
+        validate_machine_summary(machine_summary, q0_report, smoke_summary, runtime_freeze, budget_freeze)
+        return {
+            "prerequisite_q0_report_sha256": sha256_file(q0_report),
+            "prerequisite_smoke_summary_sha256": sha256_file(smoke_summary),
+            "prerequisite_machine_summary_sha256": sha256_file(machine_summary),
+        }
+    _stage_block("unsupported mode/track prerequisite combination")
+    return {}
 
 
 def main() -> None:
@@ -535,6 +893,9 @@ def main() -> None:
     parser.add_argument("--concurrency", type=int, default=1)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--request-id")
+    parser.add_argument("--q0-report", type=Path)
+    parser.add_argument("--smoke-summary", type=Path)
+    parser.add_argument("--machine-summary", type=Path)
     args = parser.parse_args()
     for path in (args.input, args.budget_freeze, args.runtime_freeze):
         if not path.is_file():
@@ -542,12 +903,22 @@ def main() -> None:
     rows = read_jsonl(args.input)
     validate_mode_arguments(args.mode, args.track, rows, args.limit, args.request_id)
     assert_independent_namespace(args.output_dir)
+    runtime = load_runtime_freeze(args.runtime_freeze)
+    budget = load_budget(args.budget_freeze, args.track, args.input)
+    prerequisites = validate_stage_prerequisites(
+        mode=args.mode,
+        track=args.track,
+        q0_report=args.q0_report,
+        smoke_summary=args.smoke_summary,
+        machine_summary=args.machine_summary,
+        runtime_freeze=args.runtime_freeze,
+        budget_freeze=args.budget_freeze,
+    )
     base_url = os.environ.get(BASE_URL_ENV_NAME, "").strip()
     if not base_url:
         raise SystemExit(f"{BASE_URL_ENV_NAME} is required; no endpoint is hard-coded")
     if os.environ.get(MODEL_ENV_NAME, MODEL) != MODEL:
         raise SystemExit(f"{MODEL_ENV_NAME} differs from the frozen model")
-    budget = load_budget(args.budget_freeze, args.track, args.input)
     items = load_items(args.input, args.track, budget["frozen_max_tokens"])
     if args.mode == "diagnostic":
         if args.request_id:
@@ -559,7 +930,7 @@ def main() -> None:
                 raise SystemExit("--limit must be positive")
             items = items[:args.limit]
     root = Path(__file__).resolve().parents[3]
-    provenance = {"git_commit_sha": git_commit(root), "runner_sha256": sha256_file(Path(__file__)), "parser_sha256": sha256_file(Path(__file__).with_name("output_contracts_v2_2.py")), "model": MODEL, **load_runtime_freeze(args.runtime_freeze), **budget}
+    provenance = {"git_commit_sha": git_commit(root), "runner_sha256": sha256_file(Path(__file__)), "parser_sha256": sha256_file(Path(__file__).with_name("output_contracts_v2_2.py")), "model": MODEL, "implementation_revision": IMPLEMENTATION_REVISION, **runtime, **budget, **prerequisites}
     runner = DeepSeekRunner(base_url=base_url, key=load_key(), output_dir=args.output_dir, concurrency=args.concurrency, provenance=provenance)
     summary = runner.run(items, args.mode)
     print(json.dumps(summary, ensure_ascii=False, indent=2))

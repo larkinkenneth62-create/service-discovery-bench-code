@@ -48,15 +48,31 @@ def synthetic_cases(max_tokens: int) -> list[R.RequestItem]:
             ]
             ids = [row["candidate_id"] for row in documents]
             payload = R.build_payload(query=query, task_type=task, prediction_target=target, candidate_documents=documents, candidate_ids=ids, contract=contract, max_tokens=max_tokens)
-            cases.append(R.RequestItem(prefix, "smoke", task, target, ids, contract, payload, R.sha256_text(prefix)))
+            cases.append(
+                R.RequestItem(
+                    prefix,
+                    "smoke",
+                    task,
+                    target,
+                    ids,
+                    contract,
+                    payload,
+                    R.sha256_text(prefix),
+                    len(R.stable_json(payload).encode("utf-8")),
+                    len(payload["messages"][1]["content"].encode("utf-8")),
+                    len(R.stable_json(documents).encode("utf-8")),
+                    R.SIZE.legal_answer_bound_bytes(contract, ids),
+                )
+            )
     return cases
 
 
 def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     counts = {status: sum(row.get("status") == status for row in rows) for status in ("succeeded", "parse_failure", "infra_error", "api_error")}
     per_contract = {contract: sum(row.get("output_contract") == contract and row.get("status") == "succeeded" for row in rows) for contract in CONTRACTS}
-    passed = (len(rows) == 6 and counts["infra_error"] == 0 and counts["api_error"] == 0 and all(row.get("status") in {"succeeded", "parse_failure"} and row.get("terminal_event_received") is True and row.get("done_received") is True for row in rows) and all(value >= 1 for value in per_contract.values()))
-    return {"status": "PASS" if passed else "FAIL", "terminal_rows": len(rows), "status_counts": counts, "per_contract_strict_parse": per_contract, "thresholds": {"requests": 6, "requests_per_contract": 2, "min_strict_parse_per_contract": 1, "unresolved_infrastructure_or_api_allowed": 0}}
+    hard_provider_failures = {"OUTPUT_BUDGET_EXHAUSTED", "CONTENT_FILTERED", "UNEXPECTED_TOOL_CALL_FINISH"}
+    passed = (len(rows) == 6 and counts["infra_error"] == 0 and counts["api_error"] == 0 and not any(row.get("error_code") in hard_provider_failures for row in rows) and all(row.get("status") in {"succeeded", "parse_failure"} and row.get("terminal_event_received") is True and row.get("done_received") is True for row in rows) and all(value >= 1 for value in per_contract.values()))
+    return {"status": "PASS" if passed else "FAIL", "provider": "deepseek", "experiment_revision": R.REVISION, "implementation_revision": R.IMPLEMENTATION_REVISION, "terminal_rows": len(rows), "status_counts": counts, "per_contract_strict_parse": per_contract, "thresholds": {"requests": 6, "requests_per_contract": 2, "min_strict_parse_per_contract": 1, "unresolved_infrastructure_or_api_allowed": 0}}
 
 
 def main() -> None:
@@ -73,11 +89,21 @@ def main() -> None:
     if not base_url:
         raise SystemExit(f"{R.BASE_URL_ENV_NAME} is required")
     budget = R.load_budget(args.budget_freeze, "native", args.native_source_manifest)
-    provenance = {"model": R.MODEL, **R.load_runtime_freeze(args.runtime_freeze), **budget}
+    runtime = R.load_runtime_freeze(args.runtime_freeze)
+    provenance = {"model": R.MODEL, "implementation_revision": R.IMPLEMENTATION_REVISION, **runtime, **budget}
     runner = R.DeepSeekRunner(base_url=base_url, key=R.load_key(), output_dir=args.output_dir, concurrency=1, provenance=provenance)
     items = synthetic_cases(budget["frozen_max_tokens"])
     runner.run(items, "diagnostic")
     report = evaluate(R.read_jsonl(args.output_dir / "REQUEST_STATUS.jsonl"))
+    report.update(
+        {
+            "runtime_freeze_sha256": R.sha256_file(args.runtime_freeze),
+            "budget_freeze_sha256": R.sha256_file(args.budget_freeze),
+            "native_source_manifest_sha256": R.sha256_file(args.native_source_manifest),
+            "diagnostic_run_summary_sha256": R.sha256_file(args.output_dir / "RUN_SUMMARY.json"),
+            "generated_at_utc": R.utc_now(),
+        }
+    )
     R.atomic_json(args.output_dir / "Q0_REPORT.json", report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     raise SystemExit(0 if report["status"] == "PASS" else 2)

@@ -122,7 +122,7 @@ def test_dev_gate_is_sixty_rows_ten_per_task_with_all_three_contracts(tmp_path: 
     runner = R.DeepSeekRunner(base_url="https://invalid.example", key="not-used", output_dir=output, concurrency=3, provenance={})
 
     def fake_run_one(item, worker_index):
-        return {"provider": "deepseek", "experiment_revision": R.REVISION, "request_id": item.request_id, "task_type": item.task_type, "output_contract": item.contract, "candidate_count": len(item.candidate_ids), "worker_index": worker_index, "status": "succeeded", "parse_status": "valid"}
+        return {"provider": "deepseek", "experiment_revision": R.REVISION, "implementation_revision": R.IMPLEMENTATION_REVISION, "request_id": item.request_id, "task_type": item.task_type, "output_contract": item.contract, "candidate_count": len(item.candidate_ids), "worker_index": worker_index, "status": "succeeded", "parse_status": "valid", "finish_reason": "stop"}
 
     runner.run_one = fake_run_one
     summary = runner.run(items, "smoke")

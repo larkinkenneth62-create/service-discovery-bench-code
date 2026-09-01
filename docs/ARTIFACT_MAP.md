@@ -11,5 +11,7 @@
 | Corrected Native scoring | `scripts/evaluation/score_single_api_correction_v1_10.py` | exact-task aggregation | V1.9 retained rows plus V1.10 Single API outputs | corrected six-task and comparison tables | Code public; tables private |
 | DeepSeek V4 Flash Native/Machine | `experiments/llm_v0_2_deepseek_v4_flash_structured_selection_v2_2/` | independent V2.2 runtime, budget, and three output contracts | frozen DeepSeek-visible manifests | DeepSeek-only statuses and parsed predictions | Code public; rows/results private |
 | DeepSeek full-track scoring | `scripts/evaluation/score_deepseek_full_v2_2.py` | exact-task six-task aggregation | one complete DeepSeek Machine or Native run plus its Gold manifest | independent DeepSeek score tables | Code public; tables pending run |
+| DeepSeek paired comparison | `scripts/evaluation/build_deepseek_native_machine_comparison_v2_2.py` | explicit frozen pairing IDs | Native/Machine per-request scores and private pairing artifact | matched ranking deltas or `PAIRING_NOT_AVAILABLE` | Code public; pairing/results private |
+| DeepSeek paper-ready bundle | `scripts/release/build_deepseek_v4_flash_v2_2_bundle.py` | R2 prerequisite hash chain and provenance | complete Q0/Smoke/Machine/Native summaries, statuses, and scores | validated ZIP, sidecar, manifest, checksums, latest result | Code public; bundle private |
 
 No numeric model result is claimed by this map before the corresponding private run passes its gate.
