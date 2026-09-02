@@ -9,8 +9,8 @@
 ## Local validation
 
 - `python -m compileall src scripts experiments tests`: PASS
-- Full public pytest: 418 passed, 2 skipped because the corresponding private generated fixtures are intentionally absent
-- DeepSeek V2.2 R3 provenance/scoring/bundle focused tests: 60 passed
+- Full public pytest: 419 passed, 2 skipped because the corresponding private generated fixtures are intentionally absent
+- DeepSeek V2.2 R3 provenance/scoring/bundle focused tests: 61 passed
 - Synthetic exact-hash binding, R3-only scoring, paired comparison, and bundle validation: PASS
 - `git diff --check`: PASS
 

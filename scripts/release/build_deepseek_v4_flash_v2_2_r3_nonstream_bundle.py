@@ -80,6 +80,26 @@ def validate_inputs(*, provenance_binding: Path, q0_report: Path, smoke_root: Pa
         "implementation_revision": IMPLEMENTATION_REVISION,
     }.items()):
         raise ValueError("BLOCKED_Q0_REPORT")
+    q0_summary_path = q0_report.parent / "RUN_SUMMARY.json"
+    if not q0_summary_path.is_file() or q0.get("diagnostic_run_summary_sha256") != sha256_file(q0_summary_path):
+        raise ValueError("BLOCKED_Q0_SUMMARY_BINDING")
+    q0_summary = read_json(q0_summary_path)
+    expected_q0_summary = {
+        "status": "DIAGNOSTIC_COMPLETE",
+        "provider": PROVIDER,
+        "experiment_revision": REVISION,
+        "implementation_revision": IMPLEMENTATION_REVISION,
+        "transport_protocol": TRANSPORT_PROTOCOL,
+        "mode": "diagnostic",
+        "track": "smoke",
+        "requested_rows": 6,
+        "terminal_rows": 6,
+    }
+    if any(q0_summary.get(field) != value for field, value in expected_q0_summary.items()):
+        raise ValueError("BLOCKED_Q0_SUMMARY_IDENTITY")
+    q0_counts = q0_summary.get("status_counts", {})
+    if int(q0_counts.get("infra_error", 0)) or int(q0_counts.get("api_error", 0)):
+        raise ValueError("BLOCKED_Q0_SUMMARY_PROVIDER_ROWS")
     smoke_path = smoke_root / "RUN_SUMMARY.json"
     machine_path = machine_root / "RUN_SUMMARY.json"
     native_path = native_root / "RUN_SUMMARY.json"
@@ -126,7 +146,7 @@ def validate_inputs(*, provenance_binding: Path, q0_report: Path, smoke_root: Pa
         details = binding.get("tracks", {}).get(track, {})
         if details.get("request_status_sha256") != sha256_file(root / "REQUEST_STATUS.jsonl") or details.get("run_summary_sha256") != sha256_file(summary_path) or details.get("attempt_ledger_sha256") != sha256_file(root / "ATTEMPT_LEDGER.jsonl"):
             raise ValueError("BLOCKED_ORIGINAL_RESULT_HASH_MISMATCH")
-    return {"binding": binding, "q0": q0, "smoke": smoke, "machine": machine, "native": native, "status_rows": status_rows, "scores": scores}
+    return {"binding": binding, "q0": q0, "q0_summary": q0_summary, "smoke": smoke, "machine": machine, "native": native, "status_rows": status_rows, "scores": scores}
 
 
 def _copy(source: Path, staging: Path, relative: Path) -> None:
@@ -152,6 +172,7 @@ def build_bundle(*, provenance_binding: Path, q0_report: Path, smoke_root: Path,
         if report.is_file():
             _copy(report, staging, Path("PROVENANCE") / report.name)
         _copy(q0_report, staging, Path("Q0/Q0_REPORT.json"))
+        _copy(q0_report.parent / "RUN_SUMMARY.json", staging, Path("Q0/RUN_SUMMARY.json"))
         for label, root in (("SMOKE", smoke_root), ("MACHINE", machine_root), ("NATIVE", native_root)):
             for filename in ("RUN_SUMMARY.json", "REQUEST_STATUS.jsonl", "ATTEMPT_LEDGER.jsonl"):
                 path = root / filename

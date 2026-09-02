@@ -37,10 +37,16 @@ def write_jsonl(path: Path, rows) -> Path:
 
 
 def make_inputs(tmp_path: Path):
+    q0_summary = write_json(tmp_path / "q0/RUN_SUMMARY.json", {
+        "status": "DIAGNOSTIC_COMPLETE", "provider": B.PROVIDER, "experiment_revision": B.REVISION,
+        "implementation_revision": B.IMPLEMENTATION_REVISION, "transport_protocol": B.TRANSPORT_PROTOCOL,
+        "mode": "diagnostic", "track": "smoke", "requested_rows": 6, "terminal_rows": 6,
+        "status_counts": {"succeeded": 6, "parse_failure": 0, "infra_error": 0, "api_error": 0},
+    })
     q0 = write_json(tmp_path / "q0/Q0_REPORT.json", {
         "status": "PASS", "provider": B.PROVIDER, "experiment_revision": B.REVISION,
         "implementation_revision": B.IMPLEMENTATION_REVISION, "runtime_freeze_sha256": "1" * 64,
-        "budget_freeze_sha256": "2" * 64,
+        "budget_freeze_sha256": "2" * 64, "diagnostic_run_summary_sha256": B.sha256_file(q0_summary),
     })
     q0_hash = B.sha256_file(q0)
     smoke, machine, native = tmp_path / "smoke", tmp_path / "machine", tmp_path / "native"
@@ -88,6 +94,13 @@ def test_r2_summary_is_blocked(tmp_path: Path):
     inputs = make_inputs(tmp_path); path = inputs["native_root"] / "RUN_SUMMARY.json"
     value = json.loads(path.read_text()); value["implementation_revision"] = "R2"; write_json(path, value)
     with pytest.raises(ValueError, match="native"):
+        B.validate_inputs(**inputs)
+
+
+def test_q0_nonstream_summary_is_hash_bound_and_required(tmp_path: Path):
+    inputs = make_inputs(tmp_path); path = inputs["q0_report"].parent / "RUN_SUMMARY.json"
+    value = json.loads(path.read_text()); value["transport_protocol"] = "sse"; write_json(path, value)
+    with pytest.raises(ValueError, match="Q0_SUMMARY_BINDING"):
         B.validate_inputs(**inputs)
 
 
