@@ -12,7 +12,7 @@ Multiple acceptable Gold sets retain frozen outer-OR/inner-AND semantics. Scorin
 
 Reports include six task rows, Macro-6 Exact Task Success, Micro Exact Task Success, Single-Service ranking, Single-API ranking, set-selection macro, Service/API, Single/Multi/Composable, candidate-count buckets, Gold-count buckets, and parse status.
 
-For DeepSeek V2.2 R2, exact task success is Hit@1 only for Single Service. Single API and all Multi/Composable tasks use selected-set Exact Set Match. `MACRO_6_EXACT_TASK_SUCCESS` is computed after task-level aggregation with six tasks weighted equally. `SET_SELECTION_MACRO_TASK_EQUAL` weights the five set-selection tasks equally; the distinct `SET_SELECTION_MICRO_ROW_WEIGHTED` reports the direct row-weighted result. Metrics that do not apply are emitted as `N/A`/`NOT_AVAILABLE`, not numeric zero. Optional source/evidence strata require an explicit private metadata field map.
+For DeepSeek V2.2 R2 and the transport-only R3 implementation, exact task success is Hit@1 only for Single Service. Single API and all Multi/Composable tasks use selected-set Exact Set Match. R3 does not modify any scoring formula: its dedicated scorer adds result-identity and provenance checks around the frozen R2 algorithms. `MACRO_6_EXACT_TASK_SUCCESS` is computed after task-level aggregation with six tasks weighted equally. `SET_SELECTION_MACRO_TASK_EQUAL` weights the five set-selection tasks equally; the distinct `SET_SELECTION_MICRO_ROW_WEIGHTED` reports the direct row-weighted result. Metrics that do not apply are emitted as `N/A`/`NOT_AVAILABLE`, not numeric zero. Optional source/evidence strata require an explicit private metadata field map.
 
 ## V1.5 R2 aggregation contract
 

@@ -13,6 +13,10 @@
 | DeepSeek full scoring | `scripts/evaluation/score_deepseek_full_v2_2.py` | Independent 197-row Machine or 4,798-row Native scoring; no Qwen merge |
 | DeepSeek paired comparison | `scripts/evaluation/build_deepseek_native_machine_comparison_v2_2.py` | Explicit frozen pairing IDs only |
 | DeepSeek result bundle | `scripts/release/build_deepseek_v4_flash_v2_2_bundle.py` | Private paper-ready validation and checksummed ZIP |
+| DeepSeek R3 provenance binding | `scripts/evaluation/build_deepseek_v2_2_r3_provenance_binding.py` | Exact-hash sidecar binding; original result files remain read-only |
+| DeepSeek R3-only scoring | `scripts/evaluation/score_deepseek_full_v2_2_r3_nonstream.py` | Accepts only V2.2 R3 JSON non-stream rows and a result-specific PASS binding |
+| DeepSeek R3 paired comparison | `scripts/evaluation/build_deepseek_native_machine_comparison_v2_2_r3_nonstream.py` | Explicit frozen pairing IDs only; otherwise `PAIRING_NOT_AVAILABLE` |
+| DeepSeek R3 result bundle | `scripts/release/build_deepseek_v4_flash_v2_2_r3_nonstream_bundle.py` | Private R3 paper-ready validation and checksummed ZIP |
 | LLM parsing | `experiments/llm_v0_2_qwen38_sse_structured_selection_v1_9/code/output_contracts_v1_5.py` | Unchanged Selection V1.5 contract |
 | LLM scoring | `scripts/evaluation/score_native_machine_selection_v1_5.py` | Current V1.5 |
 | LLM release bundle | `scripts/release/build_qwen38_structured_native_machine_bundle_v1_9.py` | Current Qwen3.8 V1.9 |

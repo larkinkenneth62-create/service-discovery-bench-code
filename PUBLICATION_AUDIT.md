@@ -1,17 +1,17 @@
 # Publication audit
 
 - Audit date: 2026-09-01
-- Baseline commit: `86a1e73123f80aa88c2d651559b2bf5571dd8c95`
-- Audited implementation: DeepSeek V2.2 R2 working tree; final commit is recorded in the handoff package
-- Target branch: `fix/deepseek-v4-flash-v2.2-r2-gates-accounting-scoring`
+- Baseline commit: `3657a53b3ac3c98adc66ee3475111ba2115b83a3`
+- Audited implementation: DeepSeek V2.2 R3 provenance-bound offline scoring working tree; final commit is recorded in the handoff package
+- Target branch: `fix/deepseek-v4-flash-v2.2-r3-nonstream-scoring-provenance`
 - Scope: sanitized code-only mirror
 
 ## Local validation
 
 - `python -m compileall src scripts experiments tests`: PASS
-- Full public pytest: 356 passed, 2 skipped because the corresponding private generated fixtures are intentionally absent
-- DeepSeek V2.2 R2 focused tests: 75 passed
-- Synthetic stage gates, finish accounting, exact longest-request coverage, scorer, paired comparison, and bundle: PASS
+- Full public pytest: 418 passed, 2 skipped because the corresponding private generated fixtures are intentionally absent
+- DeepSeek V2.2 R3 provenance/scoring/bundle focused tests: 60 passed
+- Synthetic exact-hash binding, R3-only scoring, paired comparison, and bundle validation: PASS
 - `git diff --check`: PASS
 
 ## Executable publication audit
@@ -29,7 +29,7 @@ large files = 0
 publication audit status = PASS
 ```
 
-The DeepSeek V2.2 R2 implementation stores only an endpoint SHA-256 and requires provider configuration through environment variables at runtime. No live R2 Q0, Dev, Machine, or Native request was made during this code update.
+The DeepSeek V2.2 R3 implementation stores only an endpoint SHA-256 and requires provider configuration through environment variables at runtime. This update performed no API request or model inference. It adds only offline binding/scoring/packaging code and synthetic tests. Original private R3 result files remain unedited, and no real R3 score or result artifact is included in the public repository.
 
 ## Deliberate omissions
 

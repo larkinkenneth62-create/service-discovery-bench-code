@@ -31,7 +31,7 @@ The registered paper retriever is `BGE_DENSE_V2@200`. The current independent LL
 
 DeepSeek V4 Flash V2.2 is a separate full six-task experiment under `experiments/llm_v0_2_deepseek_v4_flash_structured_selection_v2_2/`. It has its own provider configuration, credentials, runtime freeze, Q0/Dev/formal result namespace, and full-track scorer. It never resumes, merges, or scores Qwen rows. Its Chat Completions adapter uses `thinking.type=enabled`, `reasoning_effort=high`, and `response_format.type=json_object`, followed by the same strict local task validation. Thinking-mode sampling parameters are not sent because they are inapplicable.
 
-The R2 implementation requires code-enforced stage prerequisites, finish-reason accounting, exact longest-request smoke coverage, backend fingerprint capture, and full paper scoring. Live Q0 has not yet been run under R2.
+The R2 implementation requires code-enforced stage prerequisites, finish-reason accounting, exact longest-request smoke coverage, backend fingerprint capture, and full paper scoring. R3 is an additive transport-only implementation revision for a JSON non-stream gateway; it does not change prompts, candidates, output contracts, budgets, metrics, or R2 code. Its offline closeout uses a separate sidecar to bind an original `git_commit_sha=UNKNOWN` result set to the public inference commit only when runner, parser, runtime, budget, manifest, status, summary, and ledger hashes match exactly. Original status files are never edited. The public mirror contains the binding/scoring tools and synthetic tests, but no real R3 results.
 
 ## Installation
 
@@ -83,6 +83,10 @@ No values belong in Git.
 - DeepSeek V4 Flash V2.2 full-track scorer: `scripts/evaluation/score_deepseek_full_v2_2.py`
 - DeepSeek Native/Machine paired comparison: `scripts/evaluation/build_deepseek_native_machine_comparison_v2_2.py`
 - DeepSeek V4 Flash V2.2 result bundle: `scripts/release/build_deepseek_v4_flash_v2_2_bundle.py`
+- DeepSeek V2.2 R3 provenance binding: `scripts/evaluation/build_deepseek_v2_2_r3_provenance_binding.py`
+- DeepSeek V2.2 R3-only scorer: `scripts/evaluation/score_deepseek_full_v2_2_r3_nonstream.py`
+- DeepSeek V2.2 R3 paired comparison: `scripts/evaluation/build_deepseek_native_machine_comparison_v2_2_r3_nonstream.py`
+- DeepSeek V2.2 R3 result bundle: `scripts/release/build_deepseek_v4_flash_v2_2_r3_nonstream_bundle.py`
 - Current Qwen parsers: `experiments/llm_v0_2_qwen38_sse_structured_selection_v1_9/code/output_contracts_v1_5.py`
 - LLM scoring: `scripts/evaluation/score_native_machine_selection_v1_5.py`
 - LLM result bundle: `scripts/release/build_qwen38_structured_native_machine_bundle_v1_9.py`

@@ -1,5 +1,12 @@
 # Changelog
 
+## DeepSeek V4 Flash V2.2 R3 — provenance-bound offline scoring and closeout
+
+- Add an R3-only provenance builder that can bind an unedited `git_commit_sha=UNKNOWN` result set to inference commit `3657a53b3ac3c98adc66ee3475111ba2115b83a3` only through exact runner, parser, runtime, budget, manifest, result, and ledger hashes.
+- Add a non-stream-only scorer, explicit-pairing comparison, and paper-ready bundle builder without changing the frozen R2 scorer or metric formulas.
+- Preserve model-format failures in the denominator and score them as zero; Single API exact task success remains selected-set Exact Set Match.
+- Add offline synthetic regression coverage. No credentials, endpoints, benchmark rows, model responses, real scores, or result archives are published, and this update makes no model call.
+
 ## DeepSeek V4 Flash V2.2 R2 — stage gates, accounting, and paper scoring
 
 - Enforce Q0 → Smoke → Machine → Native prerequisites in code with SHA-256-bound reports before network access.
