@@ -170,18 +170,76 @@ def validate_r3_scope(track: str, manifest_rows: list[dict[str, Any]], status_ro
         _strict_prediction(source, status, artifact_root)
 
 
+def build_scoring_rows(
+    manifest_rows: list[dict[str, Any]],
+    formal_rows: list[dict[str, Any]] | None,
+    truth_rows: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    if formal_rows is None and truth_rows is None:
+        for row in manifest_rows:
+            BASE.V15._gold_sets(row)
+        return manifest_rows
+    if formal_rows is None or truth_rows is None:
+        raise ValueError("BLOCKED_SCORING_TRUTH_CROSSWALK: formal and truth manifests are required together")
+
+    def indexed(rows: list[dict[str, Any]], label: str) -> dict[str, dict[str, Any]]:
+        normalized = [{**row, "_id": row.get("benchmark_task_id", row.get("request_id"))} for row in rows]
+        return BASE.unique(normalized, "_id", label)
+
+    sources = indexed(manifest_rows, "model request manifest")
+    formal = indexed(formal_rows, "formal manifest")
+    truth = indexed(truth_rows, "evaluation truth")
+    if set(sources) != set(formal) or set(sources) != set(truth):
+        raise ValueError("BLOCKED_SCORING_TRUTH_CROSSWALK: ID sets differ")
+    merged: list[dict[str, Any]] = []
+    for request_id in sorted(sources):
+        source, bridge, gold = sources[request_id], formal[request_id], truth[request_id]
+        candidates = _candidate_ids(source)
+        expected_equal = (
+            (source.get("task_type"), bridge.get("task_type")),
+            (source.get("task_type"), gold.get("task_type")),
+            (source.get("model_request_hash"), bridge.get("model_request_hash")),
+            (source.get("candidate_order_hash"), bridge.get("candidate_order_hash")),
+            (source.get("prediction_target"), bridge.get("prediction_target")),
+            (source.get("setting"), bridge.get("setting")),
+            (bridge.get("frozen_input_hash"), gold.get("frozen_input_hash")),
+        )
+        if any(left is None or left != right for left, right in expected_equal):
+            raise ValueError(f"BLOCKED_SCORING_TRUTH_CROSSWALK: field mismatch {request_id}")
+        if bridge.get("candidate_count") != len(candidates):
+            raise ValueError(f"BLOCKED_SCORING_TRUTH_CROSSWALK: candidate count {request_id}")
+        solutions = gold.get("acceptable_solutions")
+        if not isinstance(solutions, list) or not solutions or any(
+            not isinstance(option, list) or not option or any(not isinstance(value, str) or not value for value in option)
+            for option in solutions
+        ):
+            raise ValueError(f"BLOCKED_SCORING_TRUTH_CROSSWALK: invalid Gold {request_id}")
+        candidate_set = set(candidates)
+        if any(not set(option) <= candidate_set for option in solutions):
+            raise ValueError(f"BLOCKED_SCORING_TRUTH_CROSSWALK: Gold outside candidates {request_id}")
+        clean = dict(source)
+        clean.pop("_id", None)
+        clean["acceptable_gold_sets"] = solutions
+        clean["source_dataset"] = gold.get("source_dataset")
+        merged.append(clean)
+    return merged
+
+
 def scoring_git_commit() -> str:
     return subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
 
 
-def score(*, track: str, manifest: Path, request_status: Path, run_summary: Path, artifact_root: Path, provenance_binding: Path, output_dir: Path, metadata_field_map: Path | None = None) -> dict[str, Any]:
+def score(*, track: str, manifest: Path, request_status: Path, run_summary: Path, artifact_root: Path, provenance_binding: Path, output_dir: Path, metadata_field_map: Path | None = None, formal_manifest: Path | None = None, evaluation_truth: Path | None = None) -> dict[str, Any]:
     manifest_rows = BASE.read_jsonl(manifest)
     status_rows = BASE.read_jsonl(request_status)
     binding = read_json(provenance_binding)
     validate_binding(binding, track=track, manifest=manifest, request_status=request_status, run_summary=run_summary)
     validate_r3_scope(track, manifest_rows, status_rows, artifact_root, binding)
+    formal_rows = BASE.read_jsonl(formal_manifest) if formal_manifest is not None else None
+    truth_rows = BASE.read_jsonl(evaluation_truth) if evaluation_truth is not None else None
+    scoring_rows = build_scoring_rows(manifest_rows, formal_rows, truth_rows)
     field_map = BASE.load_metadata_field_map(metadata_field_map)
-    scored = BASE.score_rows(manifest_rows, status_rows, artifact_root, track, enforce_scope=False, metadata_field_map=field_map)
+    scored = BASE.score_rows(scoring_rows, status_rows, artifact_root, track, enforce_scope=False, metadata_field_map=field_map)
     for row in scored:
         row["implementation_revision"] = IMPLEMENTATION_REVISION
         row["transport_protocol"] = TRANSPORT_PROTOCOL
@@ -202,6 +260,8 @@ def score(*, track: str, manifest: Path, request_status: Path, run_summary: Path
         "track": track,
         "rows": len(scored),
         "manifest_sha256": sha256_file(manifest),
+        "formal_manifest_sha256": sha256_file(formal_manifest) if formal_manifest is not None else None,
+        "evaluation_truth_sha256": sha256_file(evaluation_truth) if evaluation_truth is not None else None,
         "request_status_sha256": sha256_file(request_status),
         "run_summary_sha256": sha256_file(run_summary),
         "inference_provenance_binding_sha256": binding_hash,
@@ -223,6 +283,8 @@ def score(*, track: str, manifest: Path, request_status: Path, run_summary: Path
         "inference_provenance_binding_sha256": binding_hash,
         "inputs": {
             "manifest_sha256": summary["manifest_sha256"],
+            "formal_manifest_sha256": summary["formal_manifest_sha256"],
+            "evaluation_truth_sha256": summary["evaluation_truth_sha256"],
             "request_status_sha256": summary["request_status_sha256"],
             "run_summary_sha256": summary["run_summary_sha256"],
         },
@@ -248,6 +310,8 @@ def main() -> None:
     parser.add_argument("--provenance-binding", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--metadata-field-map", type=Path)
+    parser.add_argument("--formal-manifest", type=Path)
+    parser.add_argument("--evaluation-truth", type=Path)
     args = parser.parse_args()
     result = score(**vars(args))
     print(json.dumps(result, ensure_ascii=False, indent=2))

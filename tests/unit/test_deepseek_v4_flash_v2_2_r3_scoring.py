@@ -137,6 +137,29 @@ def test_single_api_primary_success_is_set_esm(tmp_path: Path):
     assert row["ranking_metrics"]["hit_at_1"] == 1 and row["set_metrics"]["exact_set_match"] == 0 and row["exact_task_success"] == 0
 
 
+def test_private_truth_crosswalk_uses_formal_hash_bridge():
+    source = {"benchmark_task_id": "r1", "task_type": "single_service_discovery", "prediction_target": "service", "setting": "native", "model_request_hash": "m1", "candidate_order_hash": "c1", "candidate_ids": ["a", "b"]}
+    formal = {"benchmark_task_id": "r1", "task_type": "single_service_discovery", "prediction_target": "service", "setting": "native", "model_request_hash": "m1", "candidate_order_hash": "c1", "candidate_count": 2, "frozen_input_hash": "f1"}
+    truth = {"benchmark_task_id": "r1", "task_type": "single_service_discovery", "frozen_input_hash": "f1", "acceptable_solutions": [["a"]], "source_dataset": "synthetic"}
+    merged = S.build_scoring_rows([source], [formal], [truth])
+    assert merged[0]["acceptable_gold_sets"] == [["a"]]
+    assert merged[0]["source_dataset"] == "synthetic"
+    assert "acceptable_gold_sets" not in source
+
+
+@pytest.mark.parametrize("field", ["model_request_hash", "candidate_order_hash", "frozen_input_hash"])
+def test_private_truth_crosswalk_rejects_hash_mismatch(field: str):
+    source = {"benchmark_task_id": "r1", "task_type": "single_service_discovery", "prediction_target": "service", "setting": "native", "model_request_hash": "m1", "candidate_order_hash": "c1", "candidate_ids": ["a"]}
+    formal = {"benchmark_task_id": "r1", "task_type": "single_service_discovery", "prediction_target": "service", "setting": "native", "model_request_hash": "m1", "candidate_order_hash": "c1", "candidate_count": 1, "frozen_input_hash": "f1"}
+    truth = {"benchmark_task_id": "r1", "task_type": "single_service_discovery", "frozen_input_hash": "f1", "acceptable_solutions": [["a"]]}
+    if field == "frozen_input_hash":
+        truth[field] = "wrong"
+    else:
+        formal[field] = "wrong"
+    with pytest.raises(ValueError, match="TRUTH_CROSSWALK"):
+        S.build_scoring_rows([source], [formal], [truth])
+
+
 @pytest.mark.parametrize("prediction,gold,expected", [
     (["a", "b"], ["a", "b"], (1, 1, 1, 1, 1, 0, 0, 0)),
     (["a"], ["a", "b"], (0, 1, .5, 2/3, 0, 1, 0, 1)),
